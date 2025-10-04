@@ -1,19 +1,12 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<string.h>
-void DirectoryWalaker();
-{
+void DirectoryWalker(){
     //find files
 }
-void MeatadataCollection();
-{
+void MeatadataCollection(){
     //collect name,size,date of modification,file path, last modified
 }
-void PathHandler();
-{
+void PathHandler(){
     //handes file path validity 
 }
-void errorhandling();
-{
+void errorhandling(){
     //prepares up the code to handes complier if case of small minute errors..
 }
