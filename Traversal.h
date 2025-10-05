@@ -1,8 +1,8 @@
-void DirectoryWalker(){
-    //find files
+void DirectoryWalker()
+{
 }
-void MeatadataCollection(){
-    //collect name,size,date of modification,file path, last modified
+void MeatadataCollection()
+{ 
 }
 void PathHandler(){
     //handes file path validity 
