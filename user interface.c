@@ -51,7 +51,7 @@ void display_results(FileGroup* duplicates)
     {
       printf("Group %d: \n", i+1);
       printf("Size: %d bytes\n", duplicates->files[i].size);
-      printf("Hash: %s \n");
+      printf("Hash: %s \n" duplicates->files[i].hash);
       printf("Paths: \n");
     }
 }
