@@ -1,5 +1,5 @@
-#ifndef USER INTERFACE_H
-#define USER INTERFACE_H
+#ifndef USER_INTERFACE_H
+#define USER_INTERFACE_H
 
 #include "common.h"
 
