@@ -32,3 +32,26 @@ ActionType configure_action()
   scanf("%d",&action);
   return(ActionType)(action-1);
 }
+
+void show_progress(int current, int total)
+{
+  printf("\rProgress: %d/%d files (%.1f%%)", current, total, (float)current/total*100);
+  fflush(stdout);
+}
+
+void show_error(const char* message)
+{
+  fprintf(stderr,"ERROR: %s\n", message);
+}
+
+void display_results(FileGroup* duplicates)
+{
+  printf("\n DUPLICATE FILES \n");
+  for(int i=0;i<duplicates->count;i++)
+    {
+      printf("Group %d: \n", i+1);
+      printf("Size: %d bytes\n", duplicates->files[i].size);
+      printf("Hash: %s \n");
+      printf("Paths: \n");
+    }
+}
