@@ -19,7 +19,6 @@ bool scan_directories(FileGroup* files) {
     while ((entry = readdir(dir)) != NULL) {
         if (entry->d_type == DT_REG) { 
            
-             This would be expanded with actual implementation
         }
     }
     
