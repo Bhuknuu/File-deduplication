@@ -3,7 +3,6 @@
 
 #include "common.h"
 
-bool scan_directories(FileGroup* files);
-void cleanup_files(FileGroup* files);
+int scan_directory(const char* path, FileInfo* files, int max_files);
 
 #endif // TRAVERSAL_H
