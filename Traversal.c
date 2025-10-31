@@ -1,6 +1,43 @@
 #include "traversal.h"
 #include <errno.h>
 
+// Compute FNV-1a hash (replacing SHA-256)
+void compute_fnv1a_hash(const char* filename, char* output) {
+    FILE* file = fopen(filename, "rb");
+    if (file == NULL) {
+        perror("Error opening file");
+        strcpy(output, "ERROR");
+        return;
+    }
+    
+    uint64_t hash = FNV_OFFSET_BASIS;
+    
+    // Read file in chunks to handle large files
+    const int bufSize = 32768;
+    unsigned char* buffer = (unsigned char*)malloc(bufSize);
+    if (buffer == NULL) {
+        perror("Memory allocation failed");
+        fclose(file);
+        strcpy(output, "ERROR");
+        return;
+    }
+    
+    int bytesRead;
+    
+    while ((bytesRead = fread(buffer, 1, bufSize, file)) > 0) {
+        for (int i = 0; i < bytesRead; i++) {
+            hash ^= buffer[i];        // XOR the byte with the hash
+            hash *= FNV_PRIME;        // Multiply by FNV prime
+        }
+    }
+    
+    // Convert 64-bit hash to 16-character hex string
+    snprintf(output, HASH_LENGTH, "%016llx", (unsigned long long)hash);
+    
+    fclose(file);
+    free(buffer);
+}
+
 int scan_directory(const char* path, FileInfo* files, int max_files) {
     DIR* dir;
     struct dirent* entry;
@@ -40,8 +77,8 @@ int scan_directory(const char* path, FileInfo* files, int max_files) {
             files[count].size = file_stat.st_size;
             files[count].modified = file_stat.st_mtime;
             
-            // Compute file hash
-            compute_sha256(full_path, files[count].hash);
+            // Compute file hash using FNV-1a (replacing SHA-256)
+            compute_fnv1a_hash(full_path, files[count].hash);
             
             count++;
             
@@ -56,37 +93,4 @@ int scan_directory(const char* path, FileInfo* files, int max_files) {
     printf("\nScan complete.\n");
     
     return count;
-}
-
-void compute_sha256(const char* filename, char* output) {
-    FILE* file = fopen(filename, "rb");
-    if (file == NULL) {
-        perror("Error opening file");
-        strcpy(output, "ERROR");
-        return;
-    }
-    
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    
-    // Read file in chunks to handle large files
-    const int bufSize = 32768;
-    unsigned char* buffer = malloc(bufSize);
-    int bytesRead;
-    
-    while ((bytesRead = fread(buffer, 1, bufSize, file))) {
-        SHA256_Update(&sha256, buffer, bytesRead);
-    }
-    
-    SHA256_Final(hash, &sha256);
-    
-    // Convert hash to hexadecimal string
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        sprintf(output + (i * 2), "%02x", hash[i]);
-    }
-    output[HASH_LENGTH - 1] = '\0';
-    
-    fclose(file);
-    free(buffer);
 }

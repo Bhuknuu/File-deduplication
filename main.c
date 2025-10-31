@@ -1,60 +1,115 @@
 #include "common.h"
 #include "traversal.h"
+#include "filter.h"
+#include "report.h"
 
-// THIS IS MAIN FILE OF FILE DEDUPLICATION PROJECT
-// IMPORTING ALL THE NECESSARY LIBRARIES AND HEADER FILES
 
-//User Interface functions
-//Filter functions
-//Progress bar function
-//Hashing functions
-//result display functions
-//Traversing functions
+void print_banner() {
+    printf("\n");
+    printf("========================================\n");
+    printf("    FILE DEDUPLICATION SYSTEM v1.0    \n");
+    printf("========================================\n");
+    printf("Team: Hungry Hashers\n");
+    printf("TCS-302 Data Structures with C\n\n");
+}
+
+void print_menu() {
+    printf("\nMAIN MENU\n");
+    printf("1. Scan Directory\n");
+    printf("2. Find Duplicates\n");
+    printf("3. Display Results\n");
+    printf("4. Exit\n");
+}
+
+void clear_input_buffer() {
+    int c;
+    while ((c = getchar()) != '\n' && c != EOF);
+}
+
+void trim_newline(char* str) {
+    int len = strlen(str);
+    if (len > 0 && str[len-1] == '\n') {
+        str[len-1] = '\0';
+    }
+}
 
 int main() {
-    FileGroup all_files = {0};
-    FileGroup duplicates = {0};
-    ActionType action = ACTION_REPORT;
+    char directory[MAX_PATH_LENGTH];
+    int choice;
+    FileInfo files[MAX_FILES];
+    int file_count = 0;
+    DuplicateResults duplicates = {0};
     
-    while (true) {
-        display_main_menu();
+    print_banner();
+    
+    while (1) {
+        print_menu();
+        printf("Enter your choice: ");
         
-        switch (get_user_choice()) {
-            case 1: // Scan directories
-                if (scan_directories(&all_files)) {
-                    printf("Scan completed! Total files found: %d.\n", all_files.count);
+        // Check if scanf succeeds
+        if (scanf("%d", &choice) != 1) {
+            printf("Invalid input. Please enter a number.\n");
+            clear_input_buffer();
+            continue;
+        }
+        clear_input_buffer();
+        
+        switch (choice) {
+            case 1: // Scan directory
+                printf("Enter directory path to scan: ");
+                if (fgets(directory, MAX_PATH_LENGTH, stdin) == NULL) {
+                    printf("Error reading input.\n");
+                    break;
+                }
+                trim_newline(directory);
+                
+                printf("Scanning directory: %s\n", directory);
+                
+                file_count = scan_directory(directory, files, MAX_FILES);
+                if (file_count > 0) {
+                    printf("Scan completed. Found %d files.\n", file_count);
+                } else {
+                    printf("No files found or error scanning directory.\n");
                 }
                 break;
                 
             case 2: // Find duplicates
-                if (all_files.count > 0) {
-                    find_duplicates(&all_files, &duplicates);
-                    printf("Duplicate groups found: %d\n", duplicates.count);
-                } else {
-                    printf("Scan directories first!\n");
+                if (file_count == 0) {
+                    printf("Please scan a directory first.\n");
+                    break;
                 }
-                break;
                 
-            case 3: // Configure action
-                action = configure_action();
-                break;
-
-    
-            case 4: // Execute action
+                free_duplicate_results(&duplicates);
+                duplicates = find_duplicates(files, file_count);
+                
                 if (duplicates.count > 0) {
-                    execute_action(&duplicates, action);
+                    printf("Found %d groups of duplicate files.\n", duplicates.count);
                 } else {
-                    printf("Find duplicates first!\n");
+                    printf("No duplicate files found.\n");
                 }
                 break;
                 
-            case 5: // Exit
-                cleanup(&all_files, &duplicates);
-                printf("Exiting...\n");
+            case 3: // Display results
+                if (duplicates.count == 0) {
+                    printf("No results to display. Please find duplicates first.\n");
+                    break;
+                }
+                
+                display_results(&duplicates);
+                break;
+                
+            case 4: // Exit
+                free_duplicate_results(&duplicates);
+                printf("Exiting program. Goodbye!\n");
                 return 0;
                 
             default:
-                printf("Invalid choice. Try again.\n");
+                printf("Invalid choice. Please try again.\n");
         }
+        
+        printf("\nPress Enter to continue...");
+        getchar();  // Pause after each operation
     }
+    
+    return 0;
 }

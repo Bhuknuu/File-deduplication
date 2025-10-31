@@ -30,11 +30,18 @@ void display_results(DuplicateResults* results) {
         
         // List all files in this group
         for (int j = 0; j < group->count; j++) {
-            char time_str[26];
-            ctime_r(&group->files[j].modified, time_str);
-            time_str[24] = '\0';  // Remove newline
+            // Use ctime instead of ctime_r for portability
+            char* time_str = ctime(&group->files[j].modified);
             
-            printf("    %s (Modified: %s)\n", group->files[j].path, time_str);
+            // Remove newline character from ctime output
+            if (time_str != NULL) {
+                char* newline = strchr(time_str, '\n');
+                if (newline) *newline = '\0';
+            }
+            
+            printf("    %s (Modified: %s)\n", 
+                   group->files[j].path, 
+                   time_str ? time_str : "Invalid time");
         }
         
         printf("\n");

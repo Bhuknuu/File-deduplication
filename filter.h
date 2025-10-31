@@ -4,5 +4,6 @@
 #include "common.h"
 
 DuplicateResults find_duplicates(FileInfo* files, int file_count);
+void free_duplicate_results(DuplicateResults* results);
 
 #endif // FILTER_H
