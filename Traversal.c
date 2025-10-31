@@ -32,7 +32,12 @@ void compute_fnv1a_hash(const char* filename, char* output) {
     }
     
     // Convert 64-bit hash to 16-character hex string
-    snprintf(output, HASH_LENGTH, "%016llx", (unsigned long long)hash);
+    // Use I64 prefix for MinGW/Windows compatibility
+    #ifdef _WIN32
+        snprintf(output, HASH_LENGTH, "%016I64x", (unsigned long long)hash);
+    #else
+        snprintf(output, HASH_LENGTH, "%016llx", (unsigned long long)hash);
+    #endif
     
     fclose(file);
     free(buffer);
@@ -46,6 +51,7 @@ int scan_directory(const char* path, FileInfo* files, int max_files) {
     int count = 0;
     
     printf("Scanning directory: %s\n", path);
+    fflush(stdout);
     
     // Open the directory
     dir = opendir(path);
@@ -73,7 +79,8 @@ int scan_directory(const char* path, FileInfo* files, int max_files) {
         // Process only regular files
         if (S_ISREG(file_stat.st_mode)) {
             // Store file metadata
-            strncpy(files[count].path, full_path, MAX_PATH_LENGTH);
+            strncpy(files[count].path, full_path, MAX_PATH_LENGTH - 1);
+            files[count].path[MAX_PATH_LENGTH - 1] = '\0';  // Ensure null termination
             files[count].size = file_stat.st_size;
             files[count].modified = file_stat.st_mtime;
             
@@ -91,6 +98,7 @@ int scan_directory(const char* path, FileInfo* files, int max_files) {
     
     closedir(dir);
     printf("\nScan complete.\n");
+    fflush(stdout);
     
     return count;
 }
