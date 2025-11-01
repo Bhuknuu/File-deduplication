@@ -49,14 +49,25 @@ int main() {
         getchar();
         return 1;
     }
+<<<<<<< HEAD
+=======
+    
+>>>>>>> e2b2e8a70c7a6611b0b2d6b02c53d5fb04fbd074
     print_banner();
     while (1) {
         print_menu();
         printf("[->] Enter your choice: ");
         
+<<<<<<< HEAD
         // Check if scanf succeeds
         if (scanf("%d", &choice) != 1){
             printf("[!] Invalid input. Please enter a number.\n");
+=======
+        if (scanf("%d", &choice) != 1) {
+            printf("Invalid input. Please enter a number.\n");
+            fflush(stdout);
+            clear_input_buffer();
+>>>>>>> e2b2e8a70c7a6611b0b2d6b02c53d5fb04fbd074
             continue;
         }
         clear_input_buffer();
@@ -116,9 +127,17 @@ int main() {
                 printf("[!] Invalid choice. Please try again.\n");
         }
         
+<<<<<<< HEAD
         printf("\nPress any key to continue");
         getchar();  // for pause 
     }
+=======
+        printf("\nPress Enter to continue...");
+        fflush(stdout);
+        getchar();  
+    }
+    
+>>>>>>> e2b2e8a70c7a6611b0b2d6b02c53d5fb04fbd074
     free(files);
     return 0;
 }
