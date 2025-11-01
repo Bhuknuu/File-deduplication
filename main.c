@@ -4,12 +4,10 @@
 #include "report.h"
 
 void print_banner() {
-    // printf("\n");
     printf("========================================\n");
     printf("    FILE DEDUPLICATION SYSTEM (DEMO)    \n");
     printf("========================================\n");
-    printf("TCS-302 Data Structures with C\n\n");
-    fflush(stdout);
+    printf("TCS-302 Data Structures with C\n");
 }
 
 void print_menu() {
@@ -18,7 +16,6 @@ void print_menu() {
     printf("2. Find Duplicates\n");
     printf("3. Display Results\n");
     printf("4. Exit\n");
-    fflush(stdout);
 }
 
 void clear_input_buffer() {
@@ -40,68 +37,53 @@ int main() {
     int file_count = 0;
     DuplicateResults duplicates = {0};
     
-    // printf("Initializing...\n");
-    // fflush(stdout);
-    
     // Allocate files array on heap to avoid stack overflow
     files = (FileInfo*)malloc(MAX_FILES * sizeof(FileInfo));
-    if (files == NULL) {
-        fprintf(stderr, "FATAL ERROR: Cannot allocate memory for file array\n");
-        fprintf(stderr, "Attempted to allocate %lu bytes\n", 
+    
+    if (files==NULL) {
+        fprintf(stderr, "[!] FATAL ERROR: Cannot allocate memory for file array\n");
+        fprintf(stderr, "[!] Attempted to allocate %lu bytes\n", 
                 (unsigned long)(MAX_FILES * sizeof(FileInfo)));
-        fprintf(stderr, "Press Enter to exit...\n");
+        fprintf(stderr, "Press any key to exit.\n");
         fflush(stderr);
         getchar();
         return 1;
     }
-    
-    // printf("Memory allocated successfully.\n");
-    // fflush(stdout);
-    
     print_banner();
-    
     while (1) {
         print_menu();
-        printf("Enter your choice: ");
-        fflush(stdout);
+        printf("[->] Enter your choice: ");
         
         // Check if scanf succeeds
-        if (scanf("%d", &choice) != 1) {
-            printf("Invalid input. Please enter a number.\n");
-            fflush(stdout);
-            clear_input_buffer();
+        if (scanf("%d", &choice) != 1){
+            printf("[!] Invalid input. Please enter a number.\n");
             continue;
         }
         clear_input_buffer();
         
         switch (choice) {
             case 1: // Scan directory
-                printf("Enter directory path to scan: ");
-                fflush(stdout);
+                printf("[->] Enter directory path to scan: ");
                 
                 if (fgets(directory, MAX_PATH_LENGTH, stdin) == NULL) {
-                    printf("Error reading input.\n");
-                    fflush(stdout);
+                    printf("[!] Error reading input.\n");
                     break;
                 }
                 trim_newline(directory);
                 
-                printf("Scanning directory: %s\n", directory);
-                fflush(stdout);
+                printf("[*] Scanning directory: %s\n", directory);
                 
                 file_count = scan_directory(directory, files, MAX_FILES);
                 if (file_count > 0) {
-                    printf("Scan completed. Found %d files.\n", file_count);
+                    printf("[ ^___^ ]Scan completed. Found %d files.\n", file_count);
                 } else {
-                    printf("No files found or error scanning directory.\n");
+                    printf("[ ^___^ ]No files found or error scanning directory.\n");
                 }
-                fflush(stdout);
                 break;
                 
             case 2: // Find duplicates
                 if (file_count == 0) {
-                    printf("Please scan a directory first.\n");
-                    fflush(stdout);
+                    printf("[!] Please scan a directory first!.\n");
                     break;
                 }
                 
@@ -109,41 +91,34 @@ int main() {
                 duplicates = find_duplicates(files, file_count);
                 
                 if (duplicates.count > 0) {
-                    printf("Found %d groups of duplicate files.\n", duplicates.count);
+                    printf("[ ^___^ ] Found %d groups of duplicate files.\n", duplicates.count);
                 } else {
-                    printf("No duplicate files found.\n");
+                    printf("[ T___T ] No duplicate files found.\n");
                 }
-                fflush(stdout);
                 break;
                 
             case 3: // Display results
                 if (duplicates.count == 0) {
-                    printf("No results to display. Please find duplicates first.\n");
-                    fflush(stdout);
+                    printf("[!] No results to display. Please find duplicates first.\n");
                     break;
                 }
                 
                 display_results(&duplicates);
                 break;
                 
-            case 4: // Exit
+            case 4: // exit selected 
                 free_duplicate_results(&duplicates);
                 free(files);
-                printf("Exiting program. Goodbye!\n");
-                fflush(stdout);
+                printf("[*] Exiting program. Seeya!\n");
                 return 0;
                 
             default:
-                printf("Invalid choice. Please try again.\n");
-                fflush(stdout);
+                printf("[!] Invalid choice. Please try again.\n");
         }
         
-        printf("\nPress Enter to continue...");
-        fflush(stdout);
-        getchar();  // Pause after each operation
+        printf("\nPress any key to continue");
+        getchar();  // for pause 
     }
-    
-    // Cleanup (unreachable but good practice)
     free(files);
     return 0;
 }

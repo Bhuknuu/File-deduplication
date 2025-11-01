@@ -1,7 +1,7 @@
 #include "report.h"
 #include <time.h>
 
-// Helper function to print large numbers in a portable way
+// Helper function to print large numbers in human-readable format
 void print_size(long long size) {
     if (size < 1024) {
         printf("%ld bytes", (long)size);
@@ -40,7 +40,7 @@ void display_results(DuplicateResults* results) {
         
         printf("  Hash: %s\n", group->files[0].hash);
         
-        // Calculate wasted space for this group
+        // Calculate wasted space (no of group members - 1) * size of one file
         long long group_wasted = (long long)(group->count - 1) * group->files[0].size;
         total_wasted += group_wasted;
         
