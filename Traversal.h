@@ -5,4 +5,4 @@
 
 int scan_directory(const char* path, FileInfo* files, int max_files);
 
-#endif // TRAVERSAL_H
+#endif 
