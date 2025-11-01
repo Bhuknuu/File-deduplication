@@ -4,7 +4,6 @@
 #include "report.h"
 
 void print_banner() {
-    // printf("\n");
     printf("========================================\n");
     printf("    FILE DEDUPLICATION SYSTEM (DEMO)    \n");
     printf("========================================\n");
@@ -40,9 +39,6 @@ int main() {
     int file_count = 0;
     DuplicateResults duplicates = {0};
     
-    // printf("Initializing...\n");
-    // fflush(stdout);
-    
     // Allocate files array on heap to avoid stack overflow
     files = (FileInfo*)malloc(MAX_FILES * sizeof(FileInfo));
     if (files == NULL) {
@@ -55,9 +51,6 @@ int main() {
         return 1;
     }
     
-    // printf("Memory allocated successfully.\n");
-    // fflush(stdout);
-    
     print_banner();
     
     while (1) {
@@ -65,7 +58,6 @@ int main() {
         printf("Enter your choice: ");
         fflush(stdout);
         
-        // Check if scanf succeeds
         if (scanf("%d", &choice) != 1) {
             printf("Invalid input. Please enter a number.\n");
             fflush(stdout);
@@ -140,10 +132,9 @@ int main() {
         
         printf("\nPress Enter to continue...");
         fflush(stdout);
-        getchar();  // Pause after each operation
+        getchar();  
     }
     
-    // Cleanup (unreachable but good practice)
     free(files);
     return 0;
 }
