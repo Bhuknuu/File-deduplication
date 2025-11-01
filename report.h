@@ -5,4 +5,4 @@
 
 void display_results(DuplicateResults* results);
 
-#endif // REPORT_H
+#endif 
