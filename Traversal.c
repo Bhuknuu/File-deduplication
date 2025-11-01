@@ -1,7 +1,6 @@
 #include "traversal.h"
 #include <errno.h>
 
-// Compute FNV-1a hash (replacing SHA-256)
 void compute_fnv1a_hash(const char* filename, char* output) {
     FILE* file = fopen(filename, "rb");
     if (file == NULL) {
@@ -12,7 +11,6 @@ void compute_fnv1a_hash(const char* filename, char* output) {
     
     uint64_t hash = FNV_OFFSET_BASIS;
     
-    // Read file in chunks to handle large files
     const int bufSize = 32768;
     unsigned char* buffer = (unsigned char*)malloc(bufSize);
     if (buffer == NULL) {
@@ -26,8 +24,8 @@ void compute_fnv1a_hash(const char* filename, char* output) {
     
     while ((bytesRead = fread(buffer, 1, bufSize, file)) > 0) {
         for (int i = 0; i < bytesRead; i++) {
-            hash ^= buffer[i];        // XOR the byte with the hash
-            hash *= FNV_PRIME;        // Multiply by FNV prime
+            hash ^= buffer[i];        
+            hash *= FNV_PRIME;
         }
     }
     
@@ -52,31 +50,26 @@ int scan_directory(const char* path, FileInfo* files, int max_files) {
     
     printf("Scanning directory: %s\n", path);
     fflush(stdout);
-    
-    // Open the directory
+   
     dir = opendir(path);
     if (dir == NULL) {
         perror("Error opening directory");
         return 0;
     }
-    
-    // Read each entry in the directory
+  
     while ((entry = readdir(dir)) != NULL && count < max_files) {
         // Skip "." and ".." entries
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
-        
-        // Construct full path
+    
         snprintf(full_path, MAX_PATH_LENGTH, "%s/%s", path, entry->d_name);
         
-        // Get file information
         if (stat(full_path, &file_stat) == -1) {
             perror("Error getting file status");
             continue;
         }
         
-        // Process only regular files
         if (S_ISREG(file_stat.st_mode)) {
             // Store file metadata
             strncpy(files[count].path, full_path, MAX_PATH_LENGTH - 1);
@@ -84,17 +77,14 @@ int scan_directory(const char* path, FileInfo* files, int max_files) {
             files[count].size = file_stat.st_size;
             files[count].modified = file_stat.st_mtime;
             
-            // Compute file hash using FNV-1a (replacing SHA-256)
             compute_fnv1a_hash(full_path, files[count].hash);
             
             count++;
             
-            // Print progress
             printf("\rScanned: %d files", count);
             fflush(stdout);
         }
-        // Note: Recursive directory scanning could be added here for subdirectories
-    }
+     }
     
     closedir(dir);
     printf("\nScan complete.\n");
