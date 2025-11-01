@@ -42,25 +42,24 @@
 
 // Structure to store file metadata
 typedef struct {
-    char path[MAX_PATH_LENGTH];  // Full path to the file
-    off_t size;                  // File size in bytes
-    time_t modified;             // Last modification time
-    char hash[HASH_LENGTH];      // Hash of file content
+    char path[MAX_PATH_LENGTH];  
+    off_t size;                  
+    time_t modified;             
+    char hash[HASH_LENGTH];      
 } FileInfo;
 
 // Structure to store a group of duplicate files
 typedef struct {
-    FileInfo* files;             // Array of duplicate files
-    int count;                   // Number of files in this group
+    FileInfo* files;             
+    int count;                  
 } DuplicateGroup;
 
 // Structure to store all duplicate groups found
 typedef struct {
-    DuplicateGroup* groups;      // Array of duplicate groups
-    int count;                   // Number of duplicate groups
+    DuplicateGroup* groups;     
+    int count;                   
 } DuplicateResults;
 
-// Function prototypes
 void print_banner();
 void print_menu();
 void clear_input_buffer();
@@ -68,4 +67,4 @@ void compute_fnv1a_hash(const char* filename, char* output);
 void trim_newline(char* str);
 void free_duplicate_results(DuplicateResults* results);
 
-#endif // COMMON_H
+#endif 
