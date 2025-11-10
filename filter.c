@@ -1,7 +1,7 @@
 #include "filter.h"
 #include <errno.h>
 
-#define HASH_TABLE_SIZE 10007  // Prime number for better distribution
+#define HASH_TABLE_SIZE 10007
 
 typedef struct HashNode {
     char hash[HASH_LENGTH];
@@ -54,11 +54,8 @@ DuplicateResults find_duplicates(FileInfo* files, int file_count) {
     
     HashNode** hash_table = calloc(HASH_TABLE_SIZE, sizeof(HashNode*));
     if (hash_table == NULL) {
-        perror("Memory allocation failed");
         return results;
     }
-    
-    printf("Finding duplicates...\n");
   
     for (int i = 0; i < file_count; i++) {
         unsigned int bucket = hash_string(files[i].hash);
@@ -69,9 +66,7 @@ DuplicateResults find_duplicates(FileInfo* files, int file_count) {
         
         while (node != NULL) {
             if (strcmp(node->hash, files[i].hash) == 0) {
-                if (!add_to_node(node, i)) {
-                    perror("Failed to add file to node");
-                }
+                add_to_node(node, i);
                 found = true;
                 break;
             }
@@ -81,10 +76,7 @@ DuplicateResults find_duplicates(FileInfo* files, int file_count) {
         
         if (!found) {
             HashNode* new_node = malloc(sizeof(HashNode));
-            if (new_node == NULL) {
-                perror("Memory allocation failed");
-                continue;
-            }
+            if (new_node == NULL) continue;
             
             strncpy(new_node->hash, files[i].hash, HASH_LENGTH);
             new_node->capacity = 4; 
@@ -93,7 +85,6 @@ DuplicateResults find_duplicates(FileInfo* files, int file_count) {
             new_node->next = NULL;
             
             if (new_node->file_indices == NULL) {
-                perror("Memory allocation failed");
                 free(new_node);
                 continue;
             }
@@ -106,13 +97,7 @@ DuplicateResults find_duplicates(FileInfo* files, int file_count) {
                 prev->next = new_node;
             }
         }
-        
-        if ((i + 1) % 100 == 0) {
-            printf("\rProcessed: %d/%d files", i + 1, file_count);
-            fflush(stdout);
-        }
     }
-    printf("\rProcessed: %d/%d files\n", file_count, file_count);
 
     int group_count = 0;
     for (int i = 0; i < HASH_TABLE_SIZE; i++) {
@@ -127,7 +112,6 @@ DuplicateResults find_duplicates(FileInfo* files, int file_count) {
    
     results.groups = malloc(group_count * sizeof(DuplicateGroup));
     if (results.groups == NULL) {
-        perror("Memory allocation failed");
         free_hash_table(hash_table);
         return results;
     }
@@ -142,7 +126,7 @@ DuplicateResults find_duplicates(FileInfo* files, int file_count) {
                 group->files = malloc(node->count * sizeof(FileInfo));
                 
                 if (group->files == NULL) {
-                    perror("Memory allocation failed");
+                    // In a real app, you might want to handle this error more gracefully
                     continue;
                 }
               
@@ -157,7 +141,6 @@ DuplicateResults find_duplicates(FileInfo* files, int file_count) {
     results.count = group_idx;
     free_hash_table(hash_table);
     
-    printf("Found %d groups of duplicates.\n", results.count);
     return results;
 }
 
