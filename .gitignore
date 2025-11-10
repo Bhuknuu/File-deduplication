@@ -1,3 +1,9 @@
 main.exe
 .vscode/
 dedup.exe
+action.o
+gui.o
+filter.o
+traversal.o
+report.o
+main.o
