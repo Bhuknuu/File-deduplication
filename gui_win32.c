@@ -3,6 +3,10 @@
 // ============================================================================
 
 #include "common.h"
+#include "traversal.h"
+#include "filter.h"
+#include "persistence.h"
+#include "action.h"
 
 // Define missing constants for older Windows SDKs
 #ifndef PBS_MARQUEE
@@ -96,7 +100,7 @@ DWORD WINAPI FindThread(LPVOID param) {
     AppendStatus("Finding duplicates...\r\n");
     
     free_duplicate_results(&g_results);
-    g_results = find_duplicates(g_files, g_file_count, &g_config);
+    g_results=find_duplicates(g_files, g_file_count, &g_config);
     
     UpdateListView();
     SendMessage(g_progress, PBM_SETMARQUEE, FALSE, 0);
