@@ -1,5 +1,6 @@
 #ifndef FILTER_H
 #define FILTER_H
+
 #include "common.h"
 
 void init_filter_config(FilterConfig* config);

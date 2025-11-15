@@ -1,72 +1,154 @@
-#include "filter.h"
-#include <errno.h>
+// ============================================================================
+// FILTER MODULE - DUPLICATE DETECTION AND FILTERING
+// ============================================================================
 
-#define HASH_TABLE_SIZE 10007
+#include "common.h"
+#include <ctype.h>
+
+void init_filter_config(FilterConfig* config) {
+    if (!config) return;
+    memset(config, 0, sizeof(FilterConfig));
+    config->hash_algo = HASH_FNV1A;
+}
+
+bool add_filter(FilterConfig* config, FilterType type) {
+    if (!config || config->count >= MAX_FILTERS) return false;
+    config->filters[config->count].type = type;
+    config->filters[config->count].enabled = true;
+    config->count++;
+    return true;
+}
+
+const char* get_hash_algorithm_name(HashAlgorithm algo) {
+    switch (algo) {
+        case HASH_FNV1A: return "FNV-1a (Fast)";
+        case HASH_MD5: return "MD5";
+        case HASH_SHA1: return "SHA-1";
+        case HASH_SHA256: return "SHA-256";
+        default: return "Unknown";
+    }
+}
+
+const char* get_filter_type_name(FilterType type) {
+    switch (type) {
+        case FILTER_NONE: return "None";
+        case FILTER_SIZE: return "File Size";
+        case FILTER_NAME: return "File Name Pattern";
+        case FILTER_EXTENSION: return "File Extension";
+        case FILTER_MODIFIED_DATE: return "Modified Date";
+        default: return "Unknown";
+    }
+}
 
 typedef struct HashNode {
     char hash[HASH_LENGTH];
-    int* file_indices;  
+    int* indices;
     int count;
     int capacity;
     struct HashNode* next;
 } HashNode;
 
 static unsigned int hash_string(const char* str) {
-    unsigned int hash = 5381;
+    unsigned int h = 5381;
     int c;
     while ((c = *str++)) {
-        hash = ((hash << 5) + hash) + c;
+        h = ((h << 5) + h) + c;
     }
-    return hash % HASH_TABLE_SIZE;
+    return h % HASH_TABLE_SIZE;
 }
 
-static bool add_to_node(HashNode* node, int file_index) {
-    if (node->count >= node->capacity) {
-        int new_capacity = node->capacity * 2;
-        int* new_indices = realloc(node->file_indices, new_capacity * sizeof(int));
-        if (new_indices == NULL) {
-            return false;
+static bool passes_filters(const FileInfo* file, const FilterConfig* config) {
+    if (!config || config->count == 0) return true;
+    
+    for (int i = 0; i < config->count; i++) {
+        const Filter* f = &config->filters[i];
+        if (!f->enabled) continue;
+        
+        switch (f->type) {
+            case FILTER_SIZE:
+                if ((f->criteria.size.min_size > 0 && file->size < f->criteria.size.min_size) ||
+                    (f->criteria.size.max_size > 0 && file->size > f->criteria.size.max_size))
+                    return false;
+                break;
+                
+            case FILTER_NAME: {
+                const char* filename = strrchr(file->path, '\\');
+                filename = filename ? filename + 1 : file->path;
+                if (f->criteria.name.case_sensitive) {
+                    if (!strstr(filename, f->criteria.name.pattern)) return false;
+                } else {
+                    char lower_file[MAX_PATH_LENGTH], lower_pattern[256];
+                    strncpy(lower_file, filename, MAX_PATH_LENGTH - 1);
+                    strncpy(lower_pattern, f->criteria.name.pattern, 255);
+                    for (char* p = lower_file; *p; p++) *p = tolower(*p);
+                    for (char* p = lower_pattern; *p; p++) *p = tolower(*p);
+                    if (!strstr(lower_file, lower_pattern)) return false;
+                }
+                break;
+            }
+            
+            case FILTER_EXTENSION: {
+                const char* ext = strrchr(file->path, '.');
+                if (!ext || _stricmp(ext + 1, f->criteria.ext.extension) != 0)
+                    return false;
+                break;
+            }
+            
+            case FILTER_MODIFIED_DATE:
+                if ((f->criteria.date.min_date > 0 && file->modified < f->criteria.date.min_date) ||
+                    (f->criteria.date.max_date > 0 && file->modified > f->criteria.date.max_date))
+                    return false;
+                break;
+                
+            default: break;
         }
-        node->file_indices = new_indices;
-        node->capacity = new_capacity;
     }
-    node->file_indices[node->count++] = file_index;
     return true;
 }
 
-static void free_hash_table(HashNode** table) {
-    if (table == NULL) return;
+DuplicateResults find_duplicates(FileInfo* files, int count, const FilterConfig* config) {
+    DuplicateResults results = {0};
+    if (!files || count <= 0) return results;
     
-    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        HashNode* node = table[i];
-        while (node != NULL) {
-            HashNode* next = node->next;
-            free(node->file_indices);
-            free(node);
-            node = next;
+    // Apply filters first
+    FileInfo* filtered = malloc(count * sizeof(FileInfo));
+    if (!filtered) return results;
+    
+    int filtered_count = 0;
+    for (int i = 0; i < count; i++) {
+        if (passes_filters(&files[i], config)) {
+            filtered[filtered_count++] = files[i];
         }
     }
-    free(table);
-}
-
-DuplicateResults find_duplicates(FileInfo* files, int file_count) {
-    DuplicateResults results = {0};
     
-    HashNode** hash_table = calloc(HASH_TABLE_SIZE, sizeof(HashNode*));
-    if (hash_table == NULL) {
+    if (filtered_count < 2) {
+        free(filtered);
         return results;
     }
-  
-    for (int i = 0; i < file_count; i++) {
-        unsigned int bucket = hash_string(files[i].hash);
+    
+    // Build hash table
+    HashNode** table = calloc(HASH_TABLE_SIZE, sizeof(HashNode*));
+    if (!table) {
+        free(filtered);
+        return results;
+    }
+    
+    for (int i = 0; i < filtered_count; i++) {
+        unsigned int bucket = hash_string(filtered[i].hash);
         
-        HashNode* node = hash_table[bucket];
+        HashNode* node = table[bucket];
         HashNode* prev = NULL;
         bool found = false;
         
-        while (node != NULL) {
-            if (strcmp(node->hash, files[i].hash) == 0) {
-                add_to_node(node, i);
+        while (node) {
+            if (strcmp(node->hash, filtered[i].hash) == 0) {
+                if (node->count >= node->capacity) {
+                    node->capacity *= GROWTH_FACTOR;
+                    int* new_indices = realloc(node->indices, node->capacity * sizeof(int));
+                    if (!new_indices) break;
+                    node->indices = new_indices;
+                }
+                node->indices[node->count++] = i;
                 found = true;
                 break;
             }
@@ -75,82 +157,85 @@ DuplicateResults find_duplicates(FileInfo* files, int file_count) {
         }
         
         if (!found) {
-            HashNode* new_node = malloc(sizeof(HashNode));
-            if (new_node == NULL) continue;
+            node = malloc(sizeof(HashNode));
+            if (!node) continue;
             
-            strncpy(new_node->hash, files[i].hash, HASH_LENGTH);
-            new_node->capacity = 4; 
-            new_node->file_indices = malloc(new_node->capacity * sizeof(int));
-            new_node->count = 0;
-            new_node->next = NULL;
+            strncpy(node->hash, filtered[i].hash, HASH_LENGTH - 1);
+            node->hash[HASH_LENGTH - 1] = '\0';
+            node->capacity = INITIAL_CAPACITY;
+            node->indices = malloc(node->capacity * sizeof(int));
+            node->count = 0;
+            node->next = NULL;
             
-            if (new_node->file_indices == NULL) {
-                free(new_node);
+            if (!node->indices) {
+                free(node);
                 continue;
             }
             
-            add_to_node(new_node, i);
-
-            if (prev == NULL) {
-                hash_table[bucket] = new_node;
-            } else {
-                prev->next = new_node;
-            }
+            node->indices[node->count++] = i;
+            
+            if (prev) prev->next = node;
+            else table[bucket] = node;
         }
     }
-
+    
+    // Count duplicate groups
     int group_count = 0;
     for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        HashNode* node = hash_table[i];
-        while (node != NULL) {
-            if (node->count > 1) {
-                group_count++;
-            }
-            node = node->next;
+        for (HashNode* n = table[i]; n; n = n->next) {
+            if (n->count > 1) group_count++;
         }
     }
-   
+    
+    // Collect results
     results.groups = malloc(group_count * sizeof(DuplicateGroup));
-    if (results.groups == NULL) {
-        free_hash_table(hash_table);
+    if (!results.groups) {
+        // Free hash table
+        for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+            HashNode* n = table[i];
+            while (n) {
+                HashNode* next = n->next;
+                free(n->indices);
+                free(n);
+                n = next;
+            }
+        }
+        free(table);
+        free(filtered);
         return results;
     }
-   
-    int group_idx = 0;
+    
+    results.count = 0;
     for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        HashNode* node = hash_table[i];
-        while (node != NULL) {
-            if (node->count > 1) {
-                DuplicateGroup* group = &results.groups[group_idx++];
-                group->count = node->count;
-                group->files = malloc(node->count * sizeof(FileInfo));
-                
-                if (group->files == NULL) {
-                    // In a real app, you might want to handle this error more gracefully
-                    continue;
-                }
-              
-                for (int j = 0; j < node->count; j++) {
-                    group->files[j] = files[node->file_indices[j]];
+        HashNode* n = table[i];
+        while (n) {
+            if (n->count > 1) {
+                DuplicateGroup* g = &results.groups[results.count++];
+                g->count = n->count;
+                g->files = malloc(n->count * sizeof(FileInfo));
+                if (g->files) {
+                    for (int j = 0; j < n->count; j++) {
+                        g->files[j] = filtered[n->indices[j]];
+                    }
                 }
             }
-            node = node->next;
+            HashNode* next = n->next;
+            free(n->indices);
+            free(n);
+            n = next;
         }
     }
     
-    results.count = group_idx;
-    free_hash_table(hash_table);
-    
+    free(table);
+    free(filtered);
     return results;
 }
 
 void free_duplicate_results(DuplicateResults* results) {
-    if (results == NULL) return;
-    
+    if (!results) return;
     for (int i = 0; i < results->count; i++) {
         free(results->groups[i].files);
     }
-    
     free(results->groups);
     results->groups = NULL;
     results->count = 0;

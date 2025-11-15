@@ -1,11 +1,24 @@
-#include "traversal.h"
-#include <errno.h>
+// ============================================================================
+// TRAVERSAL MODULE - DIRECTORY SCANNING AND FILE METADATA
+// ============================================================================
 
-// Helper function to convert Windows FILETIME to standard time_t
+#include "common.h"
+
+void init_directory_list(DirectoryList* list) {
+    if (!list) return;
+    memset(list, 0, sizeof(DirectoryList));
+    list->include_subdirs = true;
+}
+
+bool add_directory_to_list(DirectoryList* list, const char* path) {
+    if (!list || !path || list->count >= MAX_DIRECTORIES) return false;
+    strncpy(list->paths[list->count], path, MAX_PATH_LENGTH - 1);
+    list->paths[list->count][MAX_PATH_LENGTH - 1] = '\0';
+    list->count++;
+    return true;
+}
+
 static time_t FileTimeToTimeT(const FILETIME* ft) {
-    // FILETIME is 100-nanosecond intervals since January 1, 1601 (UTC)
-    // time_t is seconds since January 1, 1970 (UTC)
-    // Calculate the difference between the two epochs in 100-nanosecond intervals
     const long long EPOCH_DIFF = 116444736000000000LL;
     LARGE_INTEGER li;
     li.LowPart = ft->dwLowDateTime;
@@ -13,83 +26,74 @@ static time_t FileTimeToTimeT(const FILETIME* ft) {
     return (time_t)((li.QuadPart - EPOCH_DIFF) / 10000000LL);
 }
 
-void compute_fnv1a_hash(const char* filename, char* output) {
+void compute_hash(const char* filename, char* output, HashAlgorithm algo) {
     FILE* file = fopen(filename, "rb");
-    if (file == NULL) {
+    if (!file) {
         strcpy(output, "ERROR");
         return;
     }
     
     uint64_t hash = FNV_OFFSET_BASIS;
+    unsigned char buffer[READ_BUFFER_SIZE];
+    size_t bytes;
     
-    const int bufSize = 32768;
-    unsigned char* buffer = (unsigned char*)malloc(bufSize);
-    if (buffer == NULL) {
-        fclose(file);
-        strcpy(output, "ERROR");
-        return;
-    }
-    
-    int bytesRead;
-    
-    while ((bytesRead = fread(buffer, 1, bufSize, file)) > 0) {
-        for (int i = 0; i < bytesRead; i++) {
-            hash ^= buffer[i];        
+    while ((bytes = fread(buffer, 1, sizeof(buffer), file)) > 0) {
+        for (size_t i = 0; i < bytes; i++) {
+            hash ^= buffer[i];
             hash *= FNV_PRIME;
         }
     }
     
-    snprintf(output, HASH_LENGTH, "%016llx", (unsigned long long)hash);
-    
+    sprintf(output, "%016llx", hash);
     fclose(file);
-    free(buffer);
 }
 
-int scan_directory(const char* path, FileInfo* files, int max_files) {
-    WIN32_FIND_DATA findFileData;
+static int scan_directory_internal(const char* path, FileInfo* files, int current_count, 
+                                   int max_files, bool recurse, HashAlgorithm algo) {
+    WIN32_FIND_DATAA ffd;
     HANDLE hFind;
     char search_path[MAX_PATH_LENGTH];
-    int count = 0;
-   
-    // Create a search path like "C:\path\*"
-    snprintf(search_path, MAX_PATH_LENGTH, "%s\\*", path);
+    int count = current_count;
     
-    hFind = FindFirstFile(search_path, &findFileData);
-    if (hFind == INVALID_HANDLE_VALUE) {
-        return 0;
-    }
-  
+    snprintf(search_path, MAX_PATH_LENGTH, "%s\\*", path);
+    hFind = FindFirstFileA(search_path, &ffd);
+    
+    if (hFind == INVALID_HANDLE_VALUE) return count;
+    
     do {
-        // Skip "." and ".." entries
-        if (strcmp(findFileData.cFileName, ".") == 0 || strcmp(findFileData.cFileName, "..") == 0) {
+        if (strcmp(ffd.cFileName, ".") == 0 || strcmp(ffd.cFileName, "..") == 0)
             continue;
+        
+        char full_path[MAX_PATH_LENGTH];
+        snprintf(full_path, MAX_PATH_LENGTH, "%s\\%s", path, ffd.cFileName);
+        
+        if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            if (recurse && count < max_files) {
+                count = scan_directory_internal(full_path, files, count, max_files, true, algo);
+            }
+        } else {
+            if (count >= max_files) break;
+            
+            strncpy(files[count].path, full_path, MAX_PATH_LENGTH - 1);
+            files[count].path[MAX_PATH_LENGTH - 1] = '\0';
+            files[count].size = ((long long)ffd.nFileSizeHigh << 32) | ffd.nFileSizeLow;
+            files[count].modified = FileTimeToTimeT(&ffd.ftLastWriteTime);
+            compute_hash(full_path, files[count].hash, algo);
+            count++;
         }
-
-        // Skip directories
-        if (findFileData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
-            continue;
-        }
-
-        if (count >= max_files) {
-            break; // Reached max file limit
-        }
-
-        // Store file metadata
-        snprintf(files[count].path, MAX_PATH_LENGTH, "%s\\%s", path, findFileData.cFileName);
-        
-        // Get file size (nFileSizeHigh and nFileSizeLow must be combined)
-        files[count].size = ((long long)findFileData.nFileSizeHigh << 32) + findFileData.nFileSizeLow;
-        
-        // Get last modified time
-        files[count].modified = FileTimeToTimeT(&findFileData.ftLastWriteTime);
-        
-        compute_fnv1a_hash(files[count].path, files[count].hash);
-        
-        count++;
-
-    } while (FindNextFile(hFind, &findFileData) != 0);
+    } while (FindNextFileA(hFind, &ffd));
     
     FindClose(hFind);
-    
     return count;
+}
+
+int scan_directories_recursive(const DirectoryList* list, FileInfo* files, 
+                                int max_files, HashAlgorithm algo) {
+    if (!list || !files) return 0;
+    int total = 0;
+    for (int i = 0; i < list->count && total < max_files; i++) {
+        total = scan_directory_internal(list->paths[i], files, total, 
+                                       max_files, list->include_subdirs, algo);
+    }
+    return total;
 }
