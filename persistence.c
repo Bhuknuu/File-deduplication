@@ -1,7 +1,3 @@
-// ============================================================================
-// PERSISTENCE MODULE - SAVE/LOAD SCAN DATA
-// ============================================================================
-
 #include "common.h"
 
 bool save_scan_data(const char* filename, const ScanData* data) {

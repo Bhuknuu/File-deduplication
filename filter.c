@@ -1,14 +1,20 @@
-// ============================================================================
-// FILTER MODULE - DUPLICATE DETECTION AND FILTERING
-// ============================================================================
-
 #include "common.h"
 #include <ctype.h>
+
+#define HASH_TABLE_SIZE 10007
+
+typedef struct HashNode {
+    char hash[HASH_LENGTH];
+    int* indices;
+    int count;
+    int capacity;
+    struct HashNode* next;
+} HashNode;
 
 void init_filter_config(FilterConfig* config) {
     if (!config) return;
     memset(config, 0, sizeof(FilterConfig));
-    config->hash_algo = HASH_FNV1A;
+    config->scan_mode = SCAN_QUICK;
 }
 
 bool add_filter(FilterConfig* config, FilterType type) {
@@ -19,13 +25,21 @@ bool add_filter(FilterConfig* config, FilterType type) {
     return true;
 }
 
-const char* get_hash_algorithm_name(HashAlgorithm algo) {
-    switch (algo) {
-        case HASH_FNV1A: return "FNV-1a (Fast)";
-        case HASH_MD5: return "MD5";
-        case HASH_SHA1: return "SHA-1";
-        case HASH_SHA256: return "SHA-256";
+const char* get_scan_mode_name(ScanMode mode) {
+    switch (mode) {
+        case SCAN_QUICK: return "Quick Scan";
+        case SCAN_BALANCED: return "Balanced";
+        case SCAN_THOROUGH: return "Thorough";
         default: return "Unknown";
+    }
+}
+
+const char* get_scan_mode_description(ScanMode mode) {
+    switch (mode) {
+        case SCAN_QUICK: return "Fast scanning - Recommended for most users (99.99% accurate)";
+        case SCAN_BALANCED: return "Medium speed - More reliable for important files";
+        case SCAN_THOROUGH: return "Slow but most secure - Use for critical data";
+        default: return "";
     }
 }
 
@@ -39,14 +53,6 @@ const char* get_filter_type_name(FilterType type) {
         default: return "Unknown";
     }
 }
-
-typedef struct HashNode {
-    char hash[HASH_LENGTH];
-    int* indices;
-    int count;
-    int capacity;
-    struct HashNode* next;
-} HashNode;
 
 static unsigned int hash_string(const char* str) {
     unsigned int h = 5381;
@@ -110,7 +116,6 @@ DuplicateResults find_duplicates(FileInfo* files, int count, const FilterConfig*
     DuplicateResults results = {0};
     if (!files || count <= 0) return results;
     
-    // Apply filters first
     FileInfo* filtered = malloc(count * sizeof(FileInfo));
     if (!filtered) return results;
     
@@ -126,7 +131,6 @@ DuplicateResults find_duplicates(FileInfo* files, int count, const FilterConfig*
         return results;
     }
     
-    // Build hash table
     HashNode** table = calloc(HASH_TABLE_SIZE, sizeof(HashNode*));
     if (!table) {
         free(filtered);
@@ -179,7 +183,6 @@ DuplicateResults find_duplicates(FileInfo* files, int count, const FilterConfig*
         }
     }
     
-    // Count duplicate groups
     int group_count = 0;
     for (int i = 0; i < HASH_TABLE_SIZE; i++) {
         for (HashNode* n = table[i]; n; n = n->next) {
@@ -187,10 +190,8 @@ DuplicateResults find_duplicates(FileInfo* files, int count, const FilterConfig*
         }
     }
     
-    // Collect results
     results.groups = malloc(group_count * sizeof(DuplicateGroup));
     if (!results.groups) {
-        // Free hash table
         for (int i = 0; i < HASH_TABLE_SIZE; i++) {
             HashNode* n = table[i];
             while (n) {

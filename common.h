@@ -12,35 +12,36 @@
 #include <shlobj.h>
 
 #define MAX_PATH_LENGTH 4096
-#define HASH_LENGTH 65  // SHA-256 max (64 hex + null)
+#define HASH_LENGTH 65
 #define MAX_FILES 50000
 #define MAX_DIRECTORIES 20
 #define MAX_FILTERS 10
 #define SCAN_DATA_VERSION 2
 
-// Constants for clarity
 #define INITIAL_CAPACITY 4
 #define GROWTH_FACTOR 2
 #define READ_BUFFER_SIZE 32768
-#define HASH_TABLE_SIZE 10007  // Prime number
+#define HASH_TABLE_SIZE 10007
 
-// FNV-1a constants
 #define FNV_PRIME 1099511628211ULL
 #define FNV_OFFSET_BASIS 14695981039346656037ULL
 
-// Scan modes - User-friendly instead of confusing hash names
+// Custom window messages for thread communication
+#define WM_SCAN_COMPLETE (WM_USER + 1)
+#define WM_FIND_COMPLETE (WM_USER + 2)
+
+// Scan modes
 typedef enum {
-    SCAN_QUICK,      // FNV-1a - Fast, good for large files (99.99% accurate)
-    SCAN_BALANCED,   // MD5 - Medium speed, very reliable
-    SCAN_THOROUGH,   // SHA-256 - Slowest, cryptographically secure
+    SCAN_QUICK,
+    SCAN_BALANCED,
+    SCAN_THOROUGH,
     SCAN_MODE_COUNT
 } ScanMode;
 
-// Internal hash algorithms (not exposed to user)
+// Internal hash algorithms
 typedef enum {
     HASH_FNV1A,
     HASH_MD5,
-    HASH_SHA1,
     HASH_SHA256,
     HASH_COUNT
 } HashAlgorithm;
@@ -98,7 +99,7 @@ typedef struct {
 typedef struct {
     Filter filters[MAX_FILTERS];
     int count;
-    HashAlgorithm hash_algo;
+    ScanMode scan_mode;
 } FilterConfig;
 
 // Scan data for persistence
@@ -111,7 +112,34 @@ typedef struct {
     FileInfo* files;
 } ScanData;
 
-// Hash computation function
-void compute_hash(const char* filename, char* output, HashAlgorithm algo);
+// Thread synchronization
+extern CRITICAL_SECTION g_dataLock;
 
-#endif // COMMON_H
+// Function prototypes
+void init_directory_list(DirectoryList* list);
+bool add_directory_to_list(DirectoryList* list, const char* path);
+int scan_directories_recursive(const DirectoryList* list, FileInfo* files, int max_files, ScanMode mode);
+void compute_hash(const char* filename, char* output, ScanMode mode);
+
+void init_filter_config(FilterConfig* config);
+bool add_filter(FilterConfig* config, FilterType type);
+const char* get_scan_mode_name(ScanMode mode);
+const char* get_scan_mode_description(ScanMode mode);
+const char* get_filter_type_name(FilterType type);
+
+DuplicateResults find_duplicates(FileInfo* files, int count, const FilterConfig* config);
+void free_duplicate_results(DuplicateResults* results);
+
+bool save_scan_data(const char* filename, const ScanData* data);
+bool load_scan_data(const char* filename, ScanData* data);
+void free_scan_data(ScanData* data);
+
+bool remove_file(const char* filepath);
+int remove_duplicates_except_first(DuplicateResults* results);
+int remove_duplicates_except_index(DuplicateResults* results, int index);
+int move_duplicates_to_folder(DuplicateResults* results, int keep_index, const char* dest_folder);
+int create_hard_links(DuplicateResults* results, int keep_index);
+int create_symbolic_links(DuplicateResults* results, int keep_index);
+bool ensure_directory_exists(const char* path);
+
+#endif

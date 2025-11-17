@@ -1,7 +1,3 @@
-// ============================================================================
-// TRAVERSAL MODULE - DIRECTORY SCANNING AND FILE METADATA
-// ============================================================================
-
 #include "common.h"
 
 void init_directory_list(DirectoryList* list) {
@@ -26,7 +22,15 @@ static time_t FileTimeToTimeT(const FILETIME* ft) {
     return (time_t)((li.QuadPart - EPOCH_DIFF) / 10000000LL);
 }
 
-void compute_hash(const char* filename, char* output, HashAlgorithm algo) {
+void compute_hash(const char* filename, char* output, ScanMode mode) {
+    HashAlgorithm algo = HASH_FNV1A;
+    switch (mode) {
+        case SCAN_QUICK: algo = HASH_FNV1A; break;
+        case SCAN_BALANCED: algo = HASH_MD5; break;
+        case SCAN_THOROUGH: algo = HASH_SHA256; break;
+        default: algo = HASH_FNV1A; break;
+    }
+    
     FILE* file = fopen(filename, "rb");
     if (!file) {
         strcpy(output, "ERROR");
@@ -49,7 +53,7 @@ void compute_hash(const char* filename, char* output, HashAlgorithm algo) {
 }
 
 static int scan_directory_internal(const char* path, FileInfo* files, int current_count, 
-                                   int max_files, bool recurse, HashAlgorithm algo) {
+                                   int max_files, bool recurse, ScanMode mode) {
     WIN32_FIND_DATAA ffd;
     HANDLE hFind;
     char search_path[MAX_PATH_LENGTH];
@@ -69,7 +73,7 @@ static int scan_directory_internal(const char* path, FileInfo* files, int curren
         
         if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
             if (recurse && count < max_files) {
-                count = scan_directory_internal(full_path, files, count, max_files, true, algo);
+                count = scan_directory_internal(full_path, files, count, max_files, true, mode);
             }
         } else {
             if (count >= max_files) break;
@@ -78,7 +82,7 @@ static int scan_directory_internal(const char* path, FileInfo* files, int curren
             files[count].path[MAX_PATH_LENGTH - 1] = '\0';
             files[count].size = ((long long)ffd.nFileSizeHigh << 32) | ffd.nFileSizeLow;
             files[count].modified = FileTimeToTimeT(&ffd.ftLastWriteTime);
-            compute_hash(full_path, files[count].hash, algo);
+            compute_hash(full_path, files[count].hash, mode);
             count++;
         }
     } while (FindNextFileA(hFind, &ffd));
@@ -88,12 +92,12 @@ static int scan_directory_internal(const char* path, FileInfo* files, int curren
 }
 
 int scan_directories_recursive(const DirectoryList* list, FileInfo* files, 
-                                int max_files, HashAlgorithm algo) {
+                                int max_files, ScanMode mode) {
     if (!list || !files) return 0;
     int total = 0;
     for (int i = 0; i < list->count && total < max_files; i++) {
         total = scan_directory_internal(list->paths[i], files, total, 
-                                       max_files, list->include_subdirs, algo);
+                                       max_files, list->include_subdirs, mode);
     }
     return total;
 }
