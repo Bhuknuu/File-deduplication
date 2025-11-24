@@ -145,6 +145,18 @@ int create_hard_links(DuplicateResults* results, int keep_index) {
 int create_symbolic_links(DuplicateResults* results, int keep_index) {
     if (!results || results->count == 0) return 0;
     
+    // Load CreateSymbolicLinkA dynamically
+    HMODULE hKernel32 = GetModuleHandleA("kernel32.dll");
+    if (!hKernel32) return 0;
+    
+    CreateSymbolicLinkAFunc pCreateSymbolicLinkA = 
+        (CreateSymbolicLinkAFunc)GetProcAddress(hKernel32, "CreateSymbolicLinkA");
+    
+    if (!pCreateSymbolicLinkA) {
+        // Function not available (pre-Vista)
+        return 0;
+    }
+    
     int link_count = 0;
     for (int i = 0; i < results->count; i++) {
         DuplicateGroup* g = &results->groups[i];
@@ -160,7 +172,7 @@ int create_symbolic_links(DuplicateResults* results, int keep_index) {
             const char* target = g->files[j].path;
             DeleteFileA(target);
             
-            if (CreateSymbolicLinkA(target, source, 0)) {
+            if (pCreateSymbolicLinkA(target, source, SYMBOLIC_LINK_FLAG_FILE)) {
                 link_count++;
             }
         }
