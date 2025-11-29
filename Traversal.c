@@ -70,7 +70,8 @@ bool is_excluded(const ExclusionList* list, const char* path) {
     
     for (int i = 0; i < list->count; i++) {
         size_t excl_len = strlen(list->paths[i]);
-        if (strnicmp(path, list->paths[i], excl_len) == 0) {
+        // Use _strnicmp for Windows compatibility
+        if (_strnicmp(path, list->paths[i], excl_len) == 0) {
             // Check if it's an exact match or has a path separator
             if (strlen(path) == excl_len || path[excl_len] == '\\' || path[excl_len] == '/') {
                 return true;
@@ -143,7 +144,7 @@ void compute_hash(const char* filename, char* output, ScanMode mode) {
     
     // Initialize FNV-1a
     uint64_t hash = FNV_OFFSET_BASIS;
-    unsigned char buffer[READ_BUFFER_SIZE];
+    unsigned char buffer[64];
     size_t total_read = 0;
     size_t bytes_read;
     
@@ -335,8 +336,8 @@ int scan_directories(const ScanConfig* config, FileInfo* files, int max_files) {
 // ============================================================================
 const char* get_scan_mode_name(ScanMode mode) {
     switch (mode) {
-        case SCAN_QUICK:     return "Quick Scan";
-        case SCAN_THOROUGH:  return "Thorough Scan";
+        case SCAN_QUICK:     return "FNV-1a (1MB)";
+        case SCAN_THOROUGH:  return "FNV-1a (Full)";
         default:             return "Unknown";
     }
 }

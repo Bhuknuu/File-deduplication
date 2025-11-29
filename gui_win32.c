@@ -38,6 +38,7 @@
 #define IDC_BTN_DELETE_FIRST     1007
 #define IDC_BTN_MOVE             1008
 #define IDC_BTN_HARD_LINK        1009
+#define IDC_BTN_DELETE_BY_INDEX  1010
 
 #define IDC_LISTBOX_DIRS         2001
 #define IDC_LISTBOX_EXCLUSIONS   2002
@@ -46,6 +47,13 @@
 #define IDC_PROGRESS             2005
 #define IDC_CHECK_SUBDIRS        3001
 #define IDC_COMBO_HASH           3002
+
+// Input dialog IDs
+#define ID_INPUT_DIALOG          4000
+#define ID_INPUT_EDIT            4001
+#define ID_INPUT_OK              4002
+#define ID_INPUT_CANCEL          4003
+#define ID_STATIC                -1
 
 // Global data
 CRITICAL_SECTION g_dataLock;
@@ -67,10 +75,19 @@ static HWND g_checkSubdirs;
 static HWND g_comboHash;
 static HWND g_btnScan;
 static HWND g_btnFind;
+static HWND g_btnDeleteByIndex;
 
 // Thread handles
 static HANDLE g_hScanThread = NULL;
 static HANDLE g_hFindThread = NULL;
+
+// Input dialog variables
+static int g_inputValue = -1;
+static bool g_inputDialogResult = false;
+
+// Function prototypes
+BOOL InputBox(HWND hwnd, const char* prompt, char* buffer, int bufferSize);
+INT_PTR CALLBACK InputDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 void AppendStatus(const char* text) {
     if (!text) return;
@@ -131,6 +148,126 @@ void UpdateListView() {
     LeaveCriticalSection(&g_dataLock);
     
     AppendStatus(status);
+}
+
+// Input dialog procedure
+INT_PTR CALLBACK InputDialogProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+        case WM_INITDIALOG: {
+            // Center the dialog
+            RECT rc, rcParent;
+            GetWindowRect(hwnd, &rc);
+            GetWindowRect(GetParent(hwnd), &rcParent);
+            SetWindowPos(hwnd, NULL, 
+                rcParent.left + (rcParent.right - rcParent.left - (rc.right - rc.left)) / 2,
+                rcParent.top + (rcParent.bottom - rcParent.top - (rc.bottom - rc.top)) / 2,
+                0, 0, SWP_NOSIZE | SWP_NOZORDER);
+            
+            // Set default value
+            SetDlgItemInt(hwnd, ID_INPUT_EDIT, 1, FALSE);
+            return TRUE;
+        }
+            
+        case WM_COMMAND:
+            switch (LOWORD(wParam)) {
+                case ID_INPUT_OK:
+                    g_inputValue = GetDlgItemInt(hwnd, ID_INPUT_EDIT, NULL, FALSE);
+                    g_inputDialogResult = true;
+                    EndDialog(hwnd, IDOK);
+                    return TRUE;
+                    
+                case ID_INPUT_CANCEL:
+                    g_inputDialogResult = false;
+                    EndDialog(hwnd, IDCANCEL);
+                    return TRUE;
+            }
+            break;
+    }
+    return FALSE;
+}
+
+// Show input dialog and get index value
+bool ShowIndexInputDialog(int* result) {
+    g_inputDialogResult = false;
+    g_inputValue = -1;
+    
+    // Create a simple input dialog
+    HINSTANCE hInstance = GetModuleHandle(NULL);
+    
+    // Create dialog template in memory
+    typedef struct {
+        DLGTEMPLATE  dlgTemplate;
+        WORD         menu;
+        WORD         windowClass;
+        WCHAR        title[32];
+        WORD         pointsize;
+        WCHAR        font[32];
+    } MyDialogTemplate;
+    
+    MyDialogTemplate template = {0};
+    template.dlgTemplate.style = WS_POPUP | WS_BORDER | WS_SYSMENU | DS_MODALFRAME | DS_CENTER;
+    template.dlgTemplate.dwExtendedStyle = 0;
+    template.dlgTemplate.cdit = 3; // Number of controls
+    template.dlgTemplate.x = 0;
+    template.dlgTemplate.y = 0;
+    template.dlgTemplate.cx = 200;
+    template.dlgTemplate.cy = 100;
+    template.menu = 0;
+    template.windowClass = 0;
+    MultiByteToWideChar(CP_ACP, 0, "Select Index to Keep", -1, template.title, 32);
+    template.pointsize = 8;
+    MultiByteToWideChar(CP_ACP, 0, "MS Shell Dlg", -1, template.font, 32);
+    
+    // Create the dialog
+    HWND hDlg = CreateDialogIndirect(hInstance, (LPCDLGTEMPLATE)&template, g_hwndMain, InputDialogProc);
+    if (!hDlg) {
+        // Fallback to a simpler approach - use MessageBox
+        char msg[256];
+        sprintf(msg, "Enter index of file to keep in console and press OK when done");
+        MessageBoxA(g_hwndMain, msg, "Input Required", MB_OK | MB_ICONINFORMATION);
+        
+        // Get input from console (fallback)
+        printf("Enter index of file to keep: ");
+        char consoleInput[32];
+        fgets(consoleInput, sizeof(consoleInput), stdin);
+        consoleInput[strcspn(consoleInput, "\n")] = '\0';
+        *result = atoi(consoleInput);
+        return true;
+    }
+    
+    // Add controls manually
+    CreateWindowA("STATIC", "Enter index of file to keep:", WS_CHILD | WS_VISIBLE, 
+                  10, 10, 180, 20, hDlg, (HMENU)ID_STATIC, hInstance, NULL);
+    CreateWindowA("EDIT", "1", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_NUMBER, 
+                  10, 30, 180, 20, hDlg, (HMENU)ID_INPUT_EDIT, hInstance, NULL);
+    CreateWindowA("BUTTON", "OK", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, 
+                  60, 55, 40, 20, hDlg, (HMENU)ID_INPUT_OK, hInstance, NULL);
+    CreateWindowA("BUTTON", "Cancel", WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON, 
+                  110, 55, 40, 20, hDlg, (HMENU)ID_INPUT_CANCEL, hInstance, NULL);
+    
+    // Show dialog
+    ShowWindow(hDlg, SW_SHOW);
+    
+    // Message loop for dialog
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        if (!IsDialogMessage(hDlg, &msg)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        
+        if (msg.message == WM_NULL && msg.hwnd == hDlg) {
+            break;
+        }
+    }
+    
+    // Get result
+    if (g_inputDialogResult) {
+        *result = g_inputValue;
+    }
+    
+    DestroyWindow(hDlg);
+    return g_inputDialogResult;
 }
 
 DWORD WINAPI ScanThread(LPVOID param) {
@@ -393,6 +530,101 @@ void OnDeleteFirst() {
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_FIRST), FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE), FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_HARD_LINK), FALSE);
+    EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_BY_INDEX), FALSE);
+}
+
+void OnDeleteByIndex() {
+    int index;
+    if (!ShowIndexInputDialog(&index)) {
+        return;
+    }
+    
+    if (index <= 0) {
+        MessageBoxA(g_hwndMain, "Index must be greater than 0", 
+                   "Error", MB_ICONERROR);
+        return;
+    }
+    
+    EnterCriticalSection(&g_dataLock);
+    int total_files = 0;
+    for (int i = 0; i < g_results.count; i++) {
+        total_files += g_results.groups[i].count;
+    }
+    
+    if (index > total_files) {
+        LeaveCriticalSection(&g_dataLock);
+        MessageBoxA(g_hwndMain, "Index exceeds total number of files", 
+                   "Error", MB_ICONERROR);
+        return;
+    }
+    
+    // Find the file at the specified index
+    int current_index = 0;
+    int group_idx = -1;
+    int file_idx = -1;
+    
+    for (int i = 0; i < g_results.count; i++) {
+        for (int j = 0; j < g_results.groups[i].count; j++) {
+            current_index++;
+            if (current_index == index) {
+                group_idx = i;
+                file_idx = j;
+                break;
+            }
+        }
+        if (group_idx != -1) break;
+    }
+    
+    if (group_idx == -1 || file_idx == -1) {
+        LeaveCriticalSection(&g_dataLock);
+        MessageBoxA(g_hwndMain, "Failed to locate file at specified index", 
+                   "Error", MB_ICONERROR);
+        return;
+    }
+    
+    // Confirm deletion
+    char confirm_msg[512];
+    snprintf(confirm_msg, sizeof(confirm_msg), 
+             "Keep file at index %d and delete all other duplicates?\n\n"
+             "File to keep: %s\n\n"
+             "This CANNOT be undone!\n\nContinue?",
+             index, g_results.groups[group_idx].files[file_idx].path);
+    
+    if (MessageBoxA(g_hwndMain, confirm_msg, 
+                   "Confirm Delete", MB_YESNO | MB_ICONWARNING) != IDYES) {
+        LeaveCriticalSection(&g_dataLock);
+        return;
+    }
+    
+    // Delete all files except the one at the specified index
+    int removed = 0;
+    for (int i = 0; i < g_results.count; i++) {
+        for (int j = 0; j < g_results.groups[i].count; j++) {
+            if (i == group_idx && j == file_idx) {
+                // Skip the file to keep
+                continue;
+            }
+            
+            if (DeleteFileA(g_results.groups[i].files[j].path)) {
+                removed++;
+            }
+        }
+    }
+    
+    free_duplicate_results(&g_results);
+    memset(&g_results, 0, sizeof(g_results));
+    LeaveCriticalSection(&g_dataLock);
+    
+    char msg[128];
+    snprintf(msg, sizeof(msg), "Deleted %d duplicate files\r\n", removed);
+    AppendStatus(msg);
+    
+    ListView_DeleteAllItems(g_listResults);
+    
+    EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_FIRST), FALSE);
+    EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE), FALSE);
+    EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_HARD_LINK), FALSE);
+    EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_BY_INDEX), FALSE);
 }
 
 void OnMove() {
@@ -422,6 +654,7 @@ void OnMove() {
             EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_FIRST), FALSE);
             EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE), FALSE);
             EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_HARD_LINK), FALSE);
+            EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_BY_INDEX), FALSE);
         }
         CoTaskMemFree(pidl);
     }
@@ -457,6 +690,37 @@ void OnHardLink() {
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_FIRST), FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE), FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_HARD_LINK), FALSE);
+    EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_BY_INDEX), FALSE);
+}
+
+// Handle window resizing
+void OnSize(HWND hwnd, UINT state, int cx, int cy) {
+    // Update control positions based on new window size
+    int margin = 10;
+    int buttonWidth = 130;
+    int buttonHeight = 28;
+    int spacing = 10;
+    
+    // Calculate positions
+    int y_actions = cy - 180;
+    int y_status = cy - 80;
+    int listview_height = y_actions - 345;
+    int progress_width = cx - 20;
+    
+    // Update progress bar
+    SetWindowPos(g_hwndProgress, NULL, margin, 245, progress_width, 20, SWP_NOZORDER);
+    
+    // Update ListView
+    SetWindowPos(g_listResults, NULL, margin, 335, progress_width, listview_height, SWP_NOZORDER);
+    
+    // Update status edit
+    SetWindowPos(g_editStatus, NULL, margin, y_status, progress_width, 80, SWP_NOZORDER);
+    
+    // Update action buttons
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_DELETE_FIRST), NULL, margin, y_actions, buttonWidth, buttonHeight, SWP_NOZORDER);
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_DELETE_BY_INDEX), NULL, margin + buttonWidth + spacing, y_actions, buttonWidth, buttonHeight, SWP_NOZORDER);
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_MOVE), NULL, margin + (buttonWidth + spacing) * 2, y_actions, buttonWidth, buttonHeight, SWP_NOZORDER);
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_HARD_LINK), NULL, margin + (buttonWidth + spacing) * 3, y_actions, buttonWidth, buttonHeight, SWP_NOZORDER);
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -510,18 +774,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 10, 175, 180, 20, hwnd, (HMENU)IDC_CHECK_SUBDIRS, NULL, NULL);
             SendMessage(g_checkSubdirs, BM_SETCHECK, BST_CHECKED, 0);
             
-            CreateWindowA("STATIC", "Scan Mode:", 
+            CreateWindowA("STATIC", "Hash Algorithm:", 
                 WS_VISIBLE | WS_CHILD,
-                200, 177, 80, 20, hwnd, NULL, NULL, NULL);
+                200, 177, 100, 20, hwnd, NULL, NULL, NULL);
             
             g_comboHash = CreateWindowA("COMBOBOX", NULL,
                 WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | WS_VSCROLL,
-                280, 175, 150, 100, hwnd, (HMENU)IDC_COMBO_HASH, NULL, NULL);
+                300, 175, 150, 100, hwnd, (HMENU)IDC_COMBO_HASH, NULL, NULL);
             
             SendMessageA(g_comboHash, CB_ADDSTRING, 0, 
-                (LPARAM)get_scan_mode_name(SCAN_QUICK));
+                (LPARAM)"FNV-1a (1MB)");
             SendMessageA(g_comboHash, CB_ADDSTRING, 0, 
-                (LPARAM)get_scan_mode_name(SCAN_THOROUGH));
+                (LPARAM)"FNV-1a (Full)");
             SendMessage(g_comboHash, CB_SETCURSEL, 0, 0);
             
             g_btnScan = CreateWindowA("BUTTON", "Scan Directories", 
@@ -546,14 +810,19 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 10, 295, 130, 28, hwnd, (HMENU)IDC_BTN_DELETE_FIRST, NULL, NULL);
             EnableWindow(GetDlgItem(hwnd, IDC_BTN_DELETE_FIRST), FALSE);
             
+            CreateWindowA("BUTTON", "Delete by Index", 
+                WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
+                150, 295, 130, 28, hwnd, (HMENU)IDC_BTN_DELETE_BY_INDEX, NULL, NULL);
+            EnableWindow(GetDlgItem(hwnd, IDC_BTN_DELETE_BY_INDEX), FALSE);
+            
             CreateWindowA("BUTTON", "Move to Folder", 
                 WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                150, 295, 130, 28, hwnd, (HMENU)IDC_BTN_MOVE, NULL, NULL);
+                290, 295, 130, 28, hwnd, (HMENU)IDC_BTN_MOVE, NULL, NULL);
             EnableWindow(GetDlgItem(hwnd, IDC_BTN_MOVE), FALSE);
             
             CreateWindowA("BUTTON", "Create Hard Links", 
                 WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                290, 295, 130, 28, hwnd, (HMENU)IDC_BTN_HARD_LINK, NULL, NULL);
+                430, 295, 130, 28, hwnd, (HMENU)IDC_BTN_HARD_LINK, NULL, NULL);
             EnableWindow(GetDlgItem(hwnd, IDC_BTN_HARD_LINK), FALSE);
             
             g_listResults = CreateWindowA(WC_LISTVIEWA, NULL,
@@ -591,6 +860,10 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             break;
         }
         
+        case WM_SIZE:
+            OnSize(hwnd, (UINT)wParam, LOWORD(lParam), HIWORD(lParam));
+            return 0;
+        
         case WM_TIMER:
             if (wParam == 1) UpdateProgressBar();
             break;
@@ -623,6 +896,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             EnableWindow(GetDlgItem(hwnd, IDC_BTN_DELETE_FIRST), has_results);
             EnableWindow(GetDlgItem(hwnd, IDC_BTN_MOVE), has_results);
             EnableWindow(GetDlgItem(hwnd, IDC_BTN_HARD_LINK), has_results);
+            EnableWindow(GetDlgItem(hwnd, IDC_BTN_DELETE_BY_INDEX), has_results);
             break;
         
         case WM_COMMAND:
@@ -634,6 +908,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 case IDC_BTN_SCAN: OnScan(); break;
                 case IDC_BTN_FIND: OnFind(); break;
                 case IDC_BTN_DELETE_FIRST: OnDeleteFirst(); break;
+                case IDC_BTN_DELETE_BY_INDEX: OnDeleteByIndex(); break;
                 case IDC_BTN_MOVE: OnMove(); break;
                 case IDC_BTN_HARD_LINK: OnHardLink(); break;
             }
@@ -688,6 +963,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
     wc.lpszClassName = "FileDedupClass";
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+    wc.style = CS_HREDRAW | CS_VREDRAW;
     
     if (!RegisterClassA(&wc)) {
         MessageBoxA(NULL, "Window Registration Failed!", "Error", MB_ICONERROR);
@@ -697,8 +973,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
     
     // Create main window
     HWND hwnd = CreateWindowA("FileDedupClass", 
-        "File Deduplication System - DSA Project",
-        WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+        "File Deduplication System",
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE | WS_THICKFRAME | WS_MAXIMIZEBOX,
         CW_USEDEFAULT, CW_USEDEFAULT, 850, 700,
         NULL, NULL, hInstance, NULL);
     
