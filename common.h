@@ -1,62 +1,64 @@
+/*
+ * COMMON.H - Header file with all shared definitions
+ * 
+ * DSA PROJECT - File Deduplication System
+ * Demonstrates: Hash Tables, Dynamic Arrays, Trees, String Algorithms
+ */
+
 #ifndef COMMON_H
 #define COMMON_H
 
+// Standard library includes
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
 #include <string.h>
 #include <time.h>
 #include <stdint.h>
+
+// Windows API includes
 #include <windows.h>
 #include <commctrl.h>
 #include <shlobj.h>
 
+// ============================================================================
+// CONSTANTS
+// ============================================================================
 #define MAX_PATH_LENGTH 4096
 #define HASH_LENGTH 65
-#define MAX_FILES 50000
-#define MAX_DIRECTORIES 20
-#define MAX_FILTERS 10
-#define SCAN_DATA_VERSION 2
+#define MAX_FILES 100000
+#define MAX_DIRECTORIES 50
+#define MAX_EXCLUSIONS 20
 
-#define INITIAL_CAPACITY 4
-#define GROWTH_FACTOR 2
-#define READ_BUFFER_SIZE 32768
-#define HASH_TABLE_SIZE 10007
-
+// Hash algorithm constants (FNV-1a)
 #define FNV_PRIME 1099511628211ULL
 #define FNV_OFFSET_BASIS 14695981039346656037ULL
 
-// Custom window messages for thread communication
+// Performance tuning
+#define READ_BUFFER_SIZE 65536
+#define HASH_TABLE_SIZE 50021        // Prime number for better distribution
+#define QUICK_HASH_SIZE (1024 * 1024)
+#define THOROUGH_HASH_SIZE 0
+
+// Custom Windows messages
 #define WM_SCAN_COMPLETE (WM_USER + 1)
 #define WM_FIND_COMPLETE (WM_USER + 2)
+#define WM_UPDATE_PROGRESS (WM_USER + 3)
 
-// Scan modes
+// ============================================================================
+// SCAN MODE ENUMERATION
+// Selects hashing algorithm
+// ============================================================================
 typedef enum {
-    SCAN_QUICK,
-    SCAN_BALANCED,
-    SCAN_THOROUGH,
+    SCAN_QUICK,      // Fast: Hash first 1MB
+    SCAN_THOROUGH,   // Accurate: Hash entire file
     SCAN_MODE_COUNT
 } ScanMode;
 
-// Internal hash algorithms
-typedef enum {
-    HASH_FNV1A,
-    HASH_MD5,
-    HASH_SHA256,
-    HASH_COUNT
-} HashAlgorithm;
-
-// Filter types
-typedef enum {
-    FILTER_NONE,
-    FILTER_SIZE,
-    FILTER_NAME,
-    FILTER_EXTENSION,
-    FILTER_MODIFIED_DATE,
-    FILTER_COUNT
-} FilterType;
-
-// File metadata
+// ============================================================================
+// FILE INFORMATION STRUCTURE
+// Stores metadata for each file
+// ============================================================================
 typedef struct {
     char path[MAX_PATH_LENGTH];
     long long size;
@@ -64,82 +66,105 @@ typedef struct {
     char hash[HASH_LENGTH];
 } FileInfo;
 
-// Duplicate group
+// ============================================================================
+// DUPLICATE GROUP STRUCTURE
+// Groups files with identical content
+// ============================================================================
 typedef struct {
     FileInfo* files;
     int count;
+    int capacity;  // Added for dynamic array management
 } DuplicateGroup;
 
-// Results
+// ============================================================================
+// DUPLICATE RESULTS STRUCTURE
+// Contains all duplicate groups found
+// ============================================================================
 typedef struct {
     DuplicateGroup* groups;
     int count;
+    int capacity;  // Added for dynamic array management
 } DuplicateResults;
 
-// Directory list
+// ============================================================================
+// DIRECTORY LIST STRUCTURE
+// Fixed-size array with counter
+// ============================================================================
 typedef struct {
     char paths[MAX_DIRECTORIES][MAX_PATH_LENGTH];
     int count;
     bool include_subdirs;
 } DirectoryList;
 
-// Filter definition
+// ============================================================================
+// EXCLUSION LIST STRUCTURE
+// Folders to skip during scanning
+// ============================================================================
 typedef struct {
-    FilterType type;
-    bool enabled;
-    union {
-        struct { long long min_size; long long max_size; } size;
-        struct { char pattern[256]; bool case_sensitive; } name;
-        struct { char extension[32]; } ext;
-        struct { time_t min_date; time_t max_date; } date;
-    } criteria;
-} Filter;
-
-// Filter configuration
-typedef struct {
-    Filter filters[MAX_FILTERS];
+    char paths[MAX_EXCLUSIONS][MAX_PATH_LENGTH];
     int count;
-    ScanMode scan_mode;
-} FilterConfig;
+} ExclusionList;
 
-// Scan data for persistence
+// ============================================================================
+// SCAN CONFIGURATION STRUCTURE
+// Combines all settings for scan operation
+// ============================================================================
 typedef struct {
-    int version;
-    time_t scan_time;
-    int file_count;
-    DirectoryList dir_list;
-    FilterConfig filter_config;
-    FileInfo* files;
-} ScanData;
+    ScanMode scan_mode;
+    DirectoryList directories;
+    ExclusionList exclusions;
+} ScanConfig;
 
-// Thread synchronization
+// ============================================================================
+// PROGRESS INFORMATION STRUCTURE
+// For reporting progress to UI thread
+// ============================================================================
+typedef struct {
+    int files_scanned;
+    int current_percent;
+    bool is_complete;
+} ProgressInfo;
+
+// ============================================================================
+// GLOBAL THREAD SYNCHRONIZATION
+// ============================================================================
 extern CRITICAL_SECTION g_dataLock;
+extern ProgressInfo g_progress;
 
-// Function prototypes
+// ============================================================================
+// FUNCTION PROTOTYPES - Directory Management
+// ============================================================================
 void init_directory_list(DirectoryList* list);
-bool add_directory_to_list(DirectoryList* list, const char* path);
-int scan_directories_recursive(const DirectoryList* list, FileInfo* files, int max_files, ScanMode mode);
+bool add_directory(DirectoryList* list, const char* path);
+void init_exclusion_list(ExclusionList* list);
+bool add_exclusion(ExclusionList* list, const char* path);
+bool is_excluded(const ExclusionList* list, const char* path);
+
+// ============================================================================
+// FUNCTION PROTOTYPES - File Scanning
+// ============================================================================
+int scan_directories(const ScanConfig* config, FileInfo* files, int max_files);
 void compute_hash(const char* filename, char* output, ScanMode mode);
 
-void init_filter_config(FilterConfig* config);
-bool add_filter(FilterConfig* config, FilterType type);
-const char* get_scan_mode_name(ScanMode mode);
-const char* get_scan_mode_description(ScanMode mode);
-const char* get_filter_type_name(FilterType type);
-
-DuplicateResults find_duplicates(FileInfo* files, int count, const FilterConfig* config);
+// ============================================================================
+// FUNCTION PROTOTYPES - Duplicate Detection
+// ============================================================================
+DuplicateResults find_duplicates(FileInfo* files, int count);
 void free_duplicate_results(DuplicateResults* results);
 
-bool save_scan_data(const char* filename, const ScanData* data);
-bool load_scan_data(const char* filename, ScanData* data);
-void free_scan_data(ScanData* data);
+// ============================================================================
+// FUNCTION PROTOTYPES - File Operations
+// ============================================================================
+int remove_duplicates_keep_first(DuplicateResults* results);
+int move_duplicates(DuplicateResults* results, const char* dest_folder);
+int create_hard_links(DuplicateResults* results);
 
-bool remove_file(const char* filepath);
-int remove_duplicates_except_first(DuplicateResults* results);
-int remove_duplicates_except_index(DuplicateResults* results, int index);
-int move_duplicates_to_folder(DuplicateResults* results, int keep_index, const char* dest_folder);
-int create_hard_links(DuplicateResults* results, int keep_index);
-int create_symbolic_links(DuplicateResults* results, int keep_index);
+// ============================================================================
+// FUNCTION PROTOTYPES - Utility Functions
+// ============================================================================
+const char* get_scan_mode_name(ScanMode mode);
+const char* get_scan_mode_description(ScanMode mode);
 bool ensure_directory_exists(const char* path);
+void format_file_size(long long bytes, char* output, int output_size);
 
-#endif
+#endif // COMMON_H

@@ -1,243 +1,355 @@
+/*
+ * FILTER.C - Duplicate Detection using Hash Table
+ * 
+ * DSA CONCEPTS DEMONSTRATED:
+ * 1. Hash Table with Separate Chaining
+ * 2. Dynamic Arrays with Growth Strategy
+ * 3. Collision Resolution
+ * 4. String Hashing (DJB2 Algorithm)
+ * 5. Load Factor Analysis
+ * 
+ * ALGORITHM: Find duplicates in O(n) average time
+ */
+
 #include "common.h"
-#include <ctype.h>
 
-#define HASH_TABLE_SIZE 10007
-
+// ============================================================================
+// HASH TABLE NODE STRUCTURE
+// 
+// Each node in the linked list represents files with the same hash value
+// ============================================================================
 typedef struct HashNode {
     char hash[HASH_LENGTH];
-    int* indices;
+    int* file_indices;
     int count;
     int capacity;
     struct HashNode* next;
 } HashNode;
 
-void init_filter_config(FilterConfig* config) {
-    if (!config) return;
-    memset(config, 0, sizeof(FilterConfig));
-    config->scan_mode = SCAN_QUICK;
-}
-
-bool add_filter(FilterConfig* config, FilterType type) {
-    if (!config || config->count >= MAX_FILTERS) return false;
-    config->filters[config->count].type = type;
-    config->filters[config->count].enabled = true;
-    config->count++;
-    return true;
-}
-
-const char* get_scan_mode_name(ScanMode mode) {
-    switch (mode) {
-        case SCAN_QUICK: return "Quick Scan";
-        case SCAN_BALANCED: return "Balanced";
-        case SCAN_THOROUGH: return "Thorough";
-        default: return "Unknown";
-    }
-}
-
-const char* get_scan_mode_description(ScanMode mode) {
-    switch (mode) {
-        case SCAN_QUICK: return "Fast scanning - Recommended for most users (99.99% accurate)";
-        case SCAN_BALANCED: return "Medium speed - More reliable for important files";
-        case SCAN_THOROUGH: return "Slow but most secure - Use for critical data";
-        default: return "";
-    }
-}
-
-const char* get_filter_type_name(FilterType type) {
-    switch (type) {
-        case FILTER_NONE: return "None";
-        case FILTER_SIZE: return "File Size";
-        case FILTER_NAME: return "File Name Pattern";
-        case FILTER_EXTENSION: return "File Extension";
-        case FILTER_MODIFIED_DATE: return "Modified Date";
-        default: return "Unknown";
-    }
-}
-
-static unsigned int hash_string(const char* str) {
-    unsigned int h = 5381;
+// ============================================================================
+// DJB2 STRING HASH FUNCTION
+// 
+// PURPOSE: Convert hash string to table index
+// 
+// ALGORITHM:
+// 1. Initialize hash = 5381 (magic number)
+// 2. For each character: hash = hash * 33 + character
+// 3. Take modulo HASH_TABLE_SIZE
+// 
+// WHY THIS WORKS:
+// - Multiplication by 33 (prime-like) gives good distribution
+// - Left shift by 5 (hash << 5) = hash * 32, add hash = hash * 33
+// - Fast bit operations instead of multiplication
+// 
+// TIME COMPLEXITY: O(k) where k = string length
+// SPACE COMPLEXITY: O(1)
+// ============================================================================
+static unsigned int hash_string_to_index(const char* str) {
+    if (!str) return 0;
+    
+    unsigned int hash = 5381;
     int c;
+    
     while ((c = *str++)) {
-        h = ((h << 5) + h) + c;
+        hash = ((hash << 5) + hash) + c;  // hash * 33 + c
     }
-    return h % HASH_TABLE_SIZE;
+    
+    return hash % HASH_TABLE_SIZE;
 }
 
-static bool passes_filters(const FileInfo* file, const FilterConfig* config) {
-    if (!config || config->count == 0) return true;
+// ============================================================================
+// GROW DYNAMIC ARRAY (DOUBLING STRATEGY)
+// 
+// DSA CONCEPT: Dynamic array growth
+// 
+// STRATEGY: Double capacity when full
+// - Amortized time complexity: O(1) per insertion
+// - Total copies over n insertions: n/2 + n/4 + n/8 + ... < n
+// - Trade-off: Space vs Time
+// ============================================================================
+static bool grow_array_if_needed(HashNode* node) {
+    if (!node) return false;
     
-    for (int i = 0; i < config->count; i++) {
-        const Filter* f = &config->filters[i];
-        if (!f->enabled) continue;
+    if (node->count >= node->capacity) {
+        int new_capacity = node->capacity * 2;
+        int* new_array = (int*)realloc(
+            node->file_indices,
+            new_capacity * sizeof(int)
+        );
         
-        switch (f->type) {
-            case FILTER_SIZE:
-                if ((f->criteria.size.min_size > 0 && file->size < f->criteria.size.min_size) ||
-                    (f->criteria.size.max_size > 0 && file->size > f->criteria.size.max_size))
-                    return false;
-                break;
-                
-            case FILTER_NAME: {
-                const char* filename = strrchr(file->path, '\\');
-                filename = filename ? filename + 1 : file->path;
-                if (f->criteria.name.case_sensitive) {
-                    if (!strstr(filename, f->criteria.name.pattern)) return false;
-                } else {
-                    char lower_file[MAX_PATH_LENGTH], lower_pattern[256];
-                    strncpy(lower_file, filename, MAX_PATH_LENGTH - 1);
-                    strncpy(lower_pattern, f->criteria.name.pattern, 255);
-                    for (char* p = lower_file; *p; p++) *p = tolower(*p);
-                    for (char* p = lower_pattern; *p; p++) *p = tolower(*p);
-                    if (!strstr(lower_file, lower_pattern)) return false;
-                }
-                break;
-            }
-            
-            case FILTER_EXTENSION: {
-                const char* ext = strrchr(file->path, '.');
-                if (!ext || _stricmp(ext + 1, f->criteria.ext.extension) != 0)
-                    return false;
-                break;
-            }
-            
-            case FILTER_MODIFIED_DATE:
-                if ((f->criteria.date.min_date > 0 && file->modified < f->criteria.date.min_date) ||
-                    (f->criteria.date.max_date > 0 && file->modified > f->criteria.date.max_date))
-                    return false;
-                break;
-                
-            default: break;
-        }
+        if (!new_array) return false;
+        
+        node->file_indices = new_array;
+        node->capacity = new_capacity;
     }
+    
     return true;
 }
 
-DuplicateResults find_duplicates(FileInfo* files, int count, const FilterConfig* config) {
-    DuplicateResults results = {0};
-    if (!files || count <= 0) return results;
+// ============================================================================
+// CREATE NEW HASH NODE
+// 
+// Initializes a new node with given file index
+// ============================================================================
+static HashNode* create_hash_node(const char* hash, int file_idx) {
+    HashNode* node = (HashNode*)malloc(sizeof(HashNode));
+    if (!node) return NULL;
     
-    FileInfo* filtered = malloc(count * sizeof(FileInfo));
-    if (!filtered) return results;
+    strncpy(node->hash, hash, HASH_LENGTH - 1);
+    node->hash[HASH_LENGTH - 1] = '\0';
     
-    int filtered_count = 0;
-    for (int i = 0; i < count; i++) {
-        if (passes_filters(&files[i], config)) {
-            filtered[filtered_count++] = files[i];
+    node->capacity = 4;  // Initial capacity
+    node->file_indices = (int*)malloc(node->capacity * sizeof(int));
+    
+    if (!node->file_indices) {
+        free(node);
+        return NULL;
+    }
+    
+    node->file_indices[0] = file_idx;
+    node->count = 1;
+    node->next = NULL;
+    
+    return node;
+}
+
+// ============================================================================
+// FREE HASH TABLE
+// 
+// Deallocates all nodes in the hash table
+// ============================================================================
+static void free_hash_table(HashNode** table) {
+    if (!table) return;
+    
+    for (int i = 0; i < HASH_TABLE_SIZE; i++) {
+        HashNode* node = table[i];
+        while (node) {
+            HashNode* next = node->next;
+            free(node->file_indices);
+            free(node);
+            node = next;
         }
     }
+    free(table);
+}
+
+// ============================================================================
+// FIND DUPLICATES USING HASH TABLE
+// 
+// ALGORITHM OVERVIEW:
+// Phase 1: Build hash table
+//    - For each file, compute bucket index
+//    - Search chain for matching hash
+//    - Add to existing node or create new node
+// 
+// Phase 2: Count duplicate groups
+//    - Traverse table, count nodes with 2+ files
+// 
+// Phase 3: Extract results
+//    - Copy file information to results structure
+// 
+// TIME COMPLEXITY:
+// - Average: O(n) where n = number of files
+// - Worst: O(n²) if all hashes collide (extremely unlikely)
+// 
+// SPACE COMPLEXITY: O(n)
+// 
+// COLLISION HANDLING:
+// - Primary: Separate chaining (linked lists)
+// - Secondary: Size verification (prevents false positives)
+// ============================================================================
+DuplicateResults find_duplicates(FileInfo* files, int count) {
+    DuplicateResults results = {0};
     
-    if (filtered_count < 2) {
-        free(filtered);
+    // Validation
+    if (!files || count <= 1) {
         return results;
     }
     
-    HashNode** table = calloc(HASH_TABLE_SIZE, sizeof(HashNode*));
+    // Allocate hash table
+    HashNode** table = (HashNode**)calloc(HASH_TABLE_SIZE, sizeof(HashNode*));
     if (!table) {
-        free(filtered);
         return results;
     }
     
-    for (int i = 0; i < filtered_count; i++) {
-        unsigned int bucket = hash_string(filtered[i].hash);
+    // ========================================================================
+    // PHASE 1: BUILD HASH TABLE
+    // ========================================================================
+    for (int i = 0; i < count; i++) {
+        // Skip error hashes
+        if (strncmp(files[i].hash, "ERROR", 5) == 0) {
+            continue;
+        }
         
-        HashNode* node = table[bucket];
+        // Get bucket index
+        unsigned int bucket = hash_string_to_index(files[i].hash);
+        
+        // Search chain for matching hash
+        HashNode* current = table[bucket];
         HashNode* prev = NULL;
         bool found = false;
         
-        while (node) {
-            if (strcmp(node->hash, filtered[i].hash) == 0) {
-                if (node->count >= node->capacity) {
-                    node->capacity *= GROWTH_FACTOR;
-                    int* new_indices = realloc(node->indices, node->capacity * sizeof(int));
-                    if (!new_indices) break;
-                    node->indices = new_indices;
+        while (current) {
+            if (strcmp(current->hash, files[i].hash) == 0) {
+                // Verify file size to prevent hash collisions
+                if (files[i].size == files[current->file_indices[0]].size) {
+                    // Add to existing node
+                    if (grow_array_if_needed(current)) {
+                        current->file_indices[current->count++] = i;
+                        found = true;
+                    }
                 }
-                node->indices[node->count++] = i;
-                found = true;
                 break;
             }
-            prev = node;
-            node = node->next;
+            prev = current;
+            current = current->next;
         }
         
+        // Create new node if not found
         if (!found) {
-            node = malloc(sizeof(HashNode));
-            if (!node) continue;
-            
-            strncpy(node->hash, filtered[i].hash, HASH_LENGTH - 1);
-            node->hash[HASH_LENGTH - 1] = '\0';
-            node->capacity = INITIAL_CAPACITY;
-            node->indices = malloc(node->capacity * sizeof(int));
-            node->count = 0;
-            node->next = NULL;
-            
-            if (!node->indices) {
-                free(node);
-                continue;
+            HashNode* new_node = create_hash_node(files[i].hash, i);
+            if (new_node) {
+                // Insert at end of chain
+                if (prev) {
+                    prev->next = new_node;
+                } else {
+                    table[bucket] = new_node;
+                }
             }
-            
-            node->indices[node->count++] = i;
-            
-            if (prev) prev->next = node;
-            else table[bucket] = node;
         }
     }
     
+    // ========================================================================
+    // PHASE 2: COUNT DUPLICATE GROUPS
+    // ========================================================================
     int group_count = 0;
     for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        for (HashNode* n = table[i]; n; n = n->next) {
-            if (n->count > 1) group_count++;
+        for (HashNode* node = table[i]; node; node = node->next) {
+            if (node->count > 1) {
+                group_count++;
+            }
         }
     }
     
-    results.groups = malloc(group_count * sizeof(DuplicateGroup));
+    // No duplicates found
+    if (group_count == 0) {
+        free_hash_table(table);
+        return results;
+    }
+    
+    // ========================================================================
+    // PHASE 3: EXTRACT DUPLICATE GROUPS
+    // ========================================================================
+    results.groups = (DuplicateGroup*)malloc(group_count * sizeof(DuplicateGroup));
     if (!results.groups) {
-        for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-            HashNode* n = table[i];
-            while (n) {
-                HashNode* next = n->next;
-                free(n->indices);
-                free(n);
-                n = next;
-            }
-        }
-        free(table);
-        free(filtered);
+        free_hash_table(table);
         return results;
     }
     
     results.count = 0;
+    results.capacity = group_count;
+    
+    // Copy file information
     for (int i = 0; i < HASH_TABLE_SIZE; i++) {
-        HashNode* n = table[i];
-        while (n) {
-            if (n->count > 1) {
-                DuplicateGroup* g = &results.groups[results.count++];
-                g->count = n->count;
-                g->files = malloc(n->count * sizeof(FileInfo));
-                if (g->files) {
-                    for (int j = 0; j < n->count; j++) {
-                        g->files[j] = filtered[n->indices[j]];
+        HashNode* node = table[i];
+        while (node) {
+            if (node->count > 1) {
+                DuplicateGroup* group = &results.groups[results.count];
+                
+                group->files = (FileInfo*)malloc(node->count * sizeof(FileInfo));
+                
+                if (group->files) {
+                    group->count = node->count;
+                    group->capacity = node->count;
+                    
+                    // Copy file data
+                    for (int j = 0; j < node->count; j++) {
+                        int file_idx = node->file_indices[j];
+                        group->files[j] = files[file_idx];
                     }
+                    
+                    results.count++;
                 }
             }
-            HashNode* next = n->next;
-            free(n->indices);
-            free(n);
-            n = next;
+            node = node->next;
         }
     }
     
-    free(table);
-    free(filtered);
+    free_hash_table(table);
     return results;
 }
 
+// ============================================================================
+// FREE DUPLICATE RESULTS
+// 
+// Deallocates all memory used by results structure
+// ============================================================================
 void free_duplicate_results(DuplicateResults* results) {
     if (!results) return;
+    
     for (int i = 0; i < results->count; i++) {
         free(results->groups[i].files);
     }
+    
     free(results->groups);
     results->groups = NULL;
     results->count = 0;
+    results->capacity = 0;
 }
+
+/*
+ * ============================================================================
+ * PERFORMANCE ANALYSIS FOR DSA PROJECT
+ * ============================================================================
+ * 
+ * HASH TABLE METRICS:
+ * -------------------
+ * Load Factor (α) = n / m
+ *   where n = number of files, m = HASH_TABLE_SIZE (50021)
+ * 
+ * Example: 10,000 files → α ≈ 0.2 (excellent distribution)
+ * 
+ * COLLISION PROBABILITY:
+ * ----------------------
+ * With good hash function and α < 1:
+ * - Average chain length ≈ α
+ * - Most buckets have 0-1 items
+ * - Few long chains
+ * 
+ * COMPLEXITY ANALYSIS:
+ * --------------------
+ * Insert into hash table:
+ *   - Average: O(1)
+ *   - Worst: O(n) - all collide in one bucket
+ * 
+ * Search in hash table:
+ *   - Average: O(1)
+ *   - Worst: O(n)
+ * 
+ * Overall algorithm:
+ *   - Average: O(n) for n files
+ *   - Worst: O(n²)
+ * 
+ * DYNAMIC ARRAY AMORTIZATION:
+ * ---------------------------
+ * Doubling strategy:
+ *   - Single insertion: O(1) amortized
+ *   - Total cost over n insertions: O(n)
+ *   - Proof: 1 + 2 + 4 + 8 + ... + n < 2n
+ * 
+ * MEMORY USAGE:
+ * -------------
+ * - Hash table: 50,021 * 8 bytes ≈ 400 KB
+ * - Nodes: ~n * sizeof(HashNode) ≈ n * 56 bytes
+ * - Index arrays: ~n * 4 bytes
+ * - Total: O(n) space
+ * 
+ * COLLISION PREVENTION:
+ * ---------------------
+ * 1. Prime table size (50021) reduces patterns
+ * 2. Good hash function (DJB2) distributes uniformly
+ * 3. Size check eliminates false positives
+ * 4. 64-bit hash → collision probability ≈ 1 in 10^19
+ * 
+ * ============================================================================
+ */
