@@ -17,12 +17,12 @@
 #include <stdint.h>
 
 // Windows API includes
-#include <windows.h>
-#include <commctrl.h>
-#include <shlobj.h>
+#include <windows.h>// For Windows API functions like CreateDirectoryA, DeleteFileA, etc.
+#include <commctrl.h>// For common controls like progress bar 
+#include <shlobj.h>// For SHCreateDirectoryExA 
 
 // ============================================================================
-// CONSTANTS
+// CONSTANTS like maximum lengths and sizes for paths, hashes, arrays
 // ============================================================================
 #define MAX_PATH_LENGTH 4096
 #define HASH_LENGTH 65
@@ -30,9 +30,9 @@
 #define MAX_DIRECTORIES 50
 #define MAX_EXCLUSIONS 20
 
-// Hash algorithm constants (FNV-1a)
-#define FNV_PRIME 1099511628211ULL
-#define FNV_OFFSET_BASIS 14695981039346656037ULL
+// Hash algorithm constants (FNV-1a) // FNV-1a hash function constants
+#define FNV_PRIME 1099511628211ULL 
+#define FNV_OFFSET_BASIS 14695981039346656037ULL 
 
 // Performance tuning
 #define READ_BUFFER_SIZE 65536

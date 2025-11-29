@@ -191,10 +191,20 @@ bool ShowIndexInputDialog(int* result) {
     g_inputDialogResult = false;
     g_inputValue = -1;
     
+    // Create a simple input dialog using MessageBox
+    char input[32] = "1";
+    
+    // Use a simple input box
+    char title[64] = "Select Index to Keep";
+    char prompt[256] = "Enter index of file to keep:";
+    char buffer[32];
+    strncpy(buffer, input, sizeof(buffer) - 1);
+    buffer[sizeof(buffer) - 1] = '\0';
+    
     // Create a simple input dialog
     HINSTANCE hInstance = GetModuleHandle(NULL);
     
-    // Create dialog template in memory
+    // Create dialog template
     typedef struct {
         DLGTEMPLATE  dlgTemplate;
         WORD         menu;
@@ -214,20 +224,20 @@ bool ShowIndexInputDialog(int* result) {
     template.dlgTemplate.cy = 100;
     template.menu = 0;
     template.windowClass = 0;
-    MultiByteToWideChar(CP_ACP, 0, "Select Index to Keep", -1, template.title, 32);
+    MultiByteToWideChar(CP_ACP, 0, title, -1, template.title, 32);
     template.pointsize = 8;
     MultiByteToWideChar(CP_ACP, 0, "MS Shell Dlg", -1, template.font, 32);
     
     // Create the dialog
     HWND hDlg = CreateDialogIndirect(hInstance, (LPCDLGTEMPLATE)&template, g_hwndMain, InputDialogProc);
     if (!hDlg) {
-        // Fallback to a simpler approach - use MessageBox
+        // Fallback to console input
         char msg[256];
-        sprintf(msg, "Enter index of file to keep in console and press OK when done");
+        sprintf(msg, "%s\n\nEnter index in console and press OK when done", prompt);
         MessageBoxA(g_hwndMain, msg, "Input Required", MB_OK | MB_ICONINFORMATION);
         
-        // Get input from console (fallback)
-        printf("Enter index of file to keep: ");
+        // Get input from console
+        printf("%s: ", prompt);
         char consoleInput[32];
         fgets(consoleInput, sizeof(consoleInput), stdin);
         consoleInput[strcspn(consoleInput, "\n")] = '\0';
@@ -236,9 +246,9 @@ bool ShowIndexInputDialog(int* result) {
     }
     
     // Add controls manually
-    CreateWindowA("STATIC", "Enter index of file to keep:", WS_CHILD | WS_VISIBLE, 
+    CreateWindowA("STATIC", prompt, WS_CHILD | WS_VISIBLE, 
                   10, 10, 180, 20, hDlg, (HMENU)ID_STATIC, hInstance, NULL);
-    CreateWindowA("EDIT", "1", WS_CHILD | WS_VISIBLE | WS_BORDER | ES_NUMBER, 
+    CreateWindowA("EDIT", buffer, WS_CHILD | WS_VISIBLE | WS_BORDER | ES_NUMBER, 
                   10, 30, 180, 20, hDlg, (HMENU)ID_INPUT_EDIT, hInstance, NULL);
     CreateWindowA("BUTTON", "OK", WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON, 
                   60, 55, 40, 20, hDlg, (HMENU)ID_INPUT_OK, hInstance, NULL);
@@ -721,6 +731,25 @@ void OnSize(HWND hwnd, UINT state, int cx, int cy) {
     SetWindowPos(GetDlgItem(hwnd, IDC_BTN_DELETE_BY_INDEX), NULL, margin + buttonWidth + spacing, y_actions, buttonWidth, buttonHeight, SWP_NOZORDER);
     SetWindowPos(GetDlgItem(hwnd, IDC_BTN_MOVE), NULL, margin + (buttonWidth + spacing) * 2, y_actions, buttonWidth, buttonHeight, SWP_NOZORDER);
     SetWindowPos(GetDlgItem(hwnd, IDC_BTN_HARD_LINK), NULL, margin + (buttonWidth + spacing) * 3, y_actions, buttonWidth, buttonHeight, SWP_NOZORDER);
+    
+    // Update ListView columns to resize
+    LVCOLUMNA lvc = {0};
+    lvc.mask = LVCF_WIDTH;
+    
+    // Get current column widths
+    lvc.cx = 100;
+    ListView_SetColumn(g_listResults, 0, &lvc);
+    
+    lvc.cx = 80;
+    ListView_SetColumn(g_listResults, 1, &lvc);
+    
+    // Resize filename and path columns proportionally
+    int remaining_width = progress_width - 180; // Subtract fixed column widths
+    lvc.cx = remaining_width * 0.25; // 25% for filename
+    ListView_SetColumn(g_listResults, 2, &lvc);
+    
+    lvc.cx = remaining_width * 0.75; // 75% for path
+    ListView_SetColumn(g_listResults, 3, &lvc);
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -774,7 +803,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 10, 175, 180, 20, hwnd, (HMENU)IDC_CHECK_SUBDIRS, NULL, NULL);
             SendMessage(g_checkSubdirs, BM_SETCHECK, BST_CHECKED, 0);
             
-            CreateWindowA("STATIC", "Hash Algorithm:", 
+            CreateWindowA("STATIC", "Scan Mode:", 
                 WS_VISIBLE | WS_CHILD,
                 200, 177, 100, 20, hwnd, NULL, NULL, NULL);
             
@@ -783,9 +812,9 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 300, 175, 150, 100, hwnd, (HMENU)IDC_COMBO_HASH, NULL, NULL);
             
             SendMessageA(g_comboHash, CB_ADDSTRING, 0, 
-                (LPARAM)"FNV-1a (1MB)");
+                (LPARAM)"FNV-1a (1MB)(fast)");
             SendMessageA(g_comboHash, CB_ADDSTRING, 0, 
-                (LPARAM)"FNV-1a (Full)");
+                (LPARAM)"FNV-1a (Full)(slower)");
             SendMessage(g_comboHash, CB_SETCURSEL, 0, 0);
             
             g_btnScan = CreateWindowA("BUTTON", "Scan Directories", 
