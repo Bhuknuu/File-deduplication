@@ -1,25 +1,5 @@
-/*
- * ACTION.C - File Operations on Duplicates
- * 
- * OPERATIONS:
- * 1. Delete duplicates (keep first)
- * 2. Move duplicates to folder
- * 3. Create hard links (space-saving technique)
- * 
- * DSA CONCEPTS:
- * - Array iteration
- * - String manipulation
- * - File system operations
- */
-
 #include "common.h"
 
-// ============================================================================
-// ENSURE DIRECTORY EXISTS
-// 
-// Creates directory if it doesn't exist
-// Returns: true if directory exists/created, false otherwise
-// ============================================================================
 bool ensure_directory_exists(const char* path) {
     if (!path) return false;
     
@@ -34,22 +14,7 @@ bool ensure_directory_exists(const char* path) {
     return CreateDirectoryA(path, NULL) != 0;
 }
 
-// ============================================================================
-// REMOVE DUPLICATES - KEEP FIRST FILE
-// 
-// ALGORITHM:
-// For each duplicate group:
-//   - Keep files[0] (first occurrence)
-//   - Delete files[1], files[2], ..., files[n-1]
-// 
-// WHY KEEP FIRST?
-// - Arbitrary but consistent choice
-// - First found is often in primary location
-// - User can sort before deletion if needed
-// 
-// RETURNS: Number of files deleted
-// TIME COMPLEXITY: O(n) where n = duplicate files
-// ============================================================================
+
 int remove_duplicates_keep_first(DuplicateResults* results) {
     if (!results || results->count == 0) return 0;
     
@@ -70,23 +35,6 @@ int remove_duplicates_keep_first(DuplicateResults* results) {
     return removed;
 }
 
-// ============================================================================
-// MOVE DUPLICATES TO FOLDER
-// 
-// ALGORITHM:
-// For each duplicate group:
-//   - Keep files[0] in place
-//   - Move files[1..n] to destination folder
-//   - Handle filename conflicts by appending numbers
-// 
-// FILENAME CONFLICT RESOLUTION:
-// If file.txt exists in destination:
-//   - Try file_1.txt, file_2.txt, ..., file_9999.txt
-//   - Preserves original extension
-// 
-// RETURNS: Number of files moved
-// TIME COMPLEXITY: O(n * k) where k = conflict resolution attempts
-// ============================================================================
 int move_duplicates(DuplicateResults* results, const char* dest_folder) {
     if (!results || !dest_folder) return 0;
     if (results->count == 0) return 0;

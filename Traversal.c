@@ -3,7 +3,7 @@
  * 
  * DSA CONCEPTS DEMONSTRATED:
  * 1. Tree Traversal (Directory = Tree)
- * 2. Depth-First Search (DFS)
+ * 2. Depth-First Search (DFS) 
  * 3. Recursion
  * 4. String Manipulation
  * 5. Hash Functions (FNV-1a)
@@ -20,11 +20,6 @@ void init_directory_list(DirectoryList* list) {
     list->include_subdirs = true;
 }
 
-// ============================================================================
-// ADD DIRECTORY TO LIST
-// 
-// Returns: true if added, false if list full or invalid
-// ============================================================================
 bool add_directory(DirectoryList* list, const char* path) {
     if (!list || !path) return false;
     if (list->count >= MAX_DIRECTORIES) return false;
@@ -37,17 +32,12 @@ bool add_directory(DirectoryList* list, const char* path) {
     return true;
 }
 
-// ============================================================================
-// EXCLUSION LIST INITIALIZATION
-// ============================================================================
 void init_exclusion_list(ExclusionList* list) {
     if (!list) return;
-    memset(list, 0, sizeof(ExclusionList));
+    memset(list, 0, sizeof(ExclusionList)); 
 }
 
-// ============================================================================
-// ADD EXCLUSION PATH
-// ============================================================================
+
 bool add_exclusion(ExclusionList* list, const char* path) {
     if (!list || !path) return false;
     if (list->count >= MAX_EXCLUSIONS) return false;
@@ -60,11 +50,6 @@ bool add_exclusion(ExclusionList* list, const char* path) {
     return true;
 }
 
-// ============================================================================
-// CHECK IF PATH IS EXCLUDED
-// 
-// Uses prefix matching - if path starts with exclusion, skip it
-// ============================================================================
 bool is_excluded(const ExclusionList* list, const char* path) {
     if (!list || !path) return false;
     
@@ -81,12 +66,6 @@ bool is_excluded(const ExclusionList* list, const char* path) {
     return false;
 }
 
-// ============================================================================
-// CONVERT WINDOWS FILETIME TO UNIX TIMESTAMP
-// 
-// Windows: 100-nanosecond intervals since Jan 1, 1601
-// Unix: Seconds since Jan 1, 1970
-// ============================================================================
 static time_t FileTimeToTimeT(const FILETIME* ft) {
     if (!ft) return 0;
     
@@ -99,34 +78,6 @@ static time_t FileTimeToTimeT(const FILETIME* ft) {
     return (time_t)((li.QuadPart - EPOCH_DIFF) / 10000000LL);
 }
 
-// ============================================================================
-// FNV-1a HASH FUNCTION
-// 
-// ALGORITHM EXPLANATION:
-// FNV-1a (Fowler-Noll-Vo) is a non-cryptographic hash function
-// 
-// STEPS:
-// 1. hash = FNV_OFFSET_BASIS (large prime: 14695981039346656037)
-// 2. For each byte:
-//    a. hash = hash XOR byte
-//    b. hash = hash * FNV_PRIME (1099511628211)
-// 3. Return 64-bit hash
-// 
-// PROPERTIES:
-// - Fast: Only XOR and multiplication
-// - Good avalanche effect: Small input change → large hash change
-// - Non-cryptographic: Don't use for security!
-// - Collision resistant for practical use
-// 
-// TIME COMPLEXITY: O(n) where n = bytes to hash
-// SPACE COMPLEXITY: O(1)
-// 
-// WHY FNV-1a?
-// - Simple to implement (good for learning)
-// - Fast performance
-// - Good distribution properties
-// - Better than simple additive or XOR hashing
-// ============================================================================
 void compute_hash(const char* filename, char* output, ScanMode mode) {
     if (!filename || !output) {
         if (output) strcpy(output, "ERROR_NULL");
@@ -170,36 +121,6 @@ void compute_hash(const char* filename, char* output, ScanMode mode) {
     sprintf(output, "%016llx", (unsigned long long)hash);
 }
 
-// ============================================================================
-// RECURSIVE DIRECTORY SCANNER (INTERNAL)
-// 
-// DSA CONCEPT: Depth-First Search (DFS) on Tree
-// 
-// DIRECTORY STRUCTURE AS TREE:
-//   C:\
-//   ├── folder1/
-//   │   ├── file1.txt
-//   │   └── subfolder/
-//   │       └── file2.txt
-//   └── folder2/
-//       └── file3.txt
-// 
-// TRAVERSAL: Pre-order DFS
-// 1. Visit node (process files in directory)
-// 2. Recurse left child (first subdirectory)
-// 3. Recurse right sibling (next subdirectory)
-// 
-// TIME COMPLEXITY: O(n) where n = total files + directories
-// SPACE COMPLEXITY: O(d) where d = maximum directory depth (recursion stack)
-// 
-// ALGORITHM:
-// 1. Open directory
-// 2. For each item:
-//    - Skip "." and ".."
-//    - If directory: recurse if enabled
-//    - If file: collect metadata and hash
-// 3. Close directory
-// ============================================================================
 static int scan_directory_internal(
     const char* path,
     FileInfo* files,
@@ -291,12 +212,7 @@ static int scan_directory_internal(
     return count;
 }
 
-// ============================================================================
-// PUBLIC INTERFACE: SCAN MULTIPLE DIRECTORIES
-// 
-// Scans all directories in configuration
-// Returns: Number of files found
-// ============================================================================
+
 int scan_directories(const ScanConfig* config, FileInfo* files, int max_files) {
     if (!config || !files || max_files <= 0) return 0;
     
