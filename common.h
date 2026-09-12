@@ -15,6 +15,8 @@
 #include <string.h>
 #include <time.h>
 #include <stdint.h>
+#include <stdarg.h>
+#include <ctype.h>
 
 // Windows API includes
 #include <windows.h>// For Windows API functions like CreateDirectoryA, DeleteFileA, etc.
@@ -25,14 +27,10 @@
 // CONSTANTS like maximum lengths and sizes for paths, hashes, arrays
 // ============================================================================
 #define MAX_PATH_LENGTH 4096
-#define HASH_LENGTH 65
+#define HASH_LENGTH 65               /* SHA-256 hex string: 64 chars + null terminator */
 #define MAX_FILES 100000
 #define MAX_DIRECTORIES 50
 #define MAX_EXCLUSIONS 20
-
-// Hash algorithm constants (FNV-1a) // FNV-1a hash function constants
-#define FNV_PRIME 1099511628211ULL 
-#define FNV_OFFSET_BASIS 14695981039346656037ULL 
 
 // Performance tuning
 #define READ_BUFFER_SIZE 65536
@@ -106,8 +104,54 @@ typedef struct {
 } ExclusionList;
 
 // ============================================================================
+// FILE SIZE FILTER STRUCTURE
+// For filtering files by size
+// ============================================================================
+typedef struct {
+    long long min_size;  // 0 = no minimum
+    long long max_size;  // -1 = no maximum
+} SizeFilter;
+
+// ============================================================================
+// EXTENSION FILTER STRUCTURE
+// For including/excluding file types
+// ============================================================================
+typedef struct {
+    char extensions[MAX_EXCLUSIONS][32];
+    int count;
+    bool is_whitelist;  // true = include only these, false = exclude these
+} ExtensionFilter;
+
+// ============================================================================
+// OPERATION OPTIONS STRUCTURE
+// Controls how operations are performed
+// ============================================================================
+typedef struct {
+    bool dry_run;           // Preview only, don't modify files
+    bool safe_delete;       // Move to backup folder instead of permanent delete
+    bool log_operations;    // Write operations to log file
+    bool skip_hidden;       // Skip hidden files
+    bool skip_system;       // Skip system files
+} OperationOptions;
+
+// ============================================================================
+// ADVANCED CONFIGURATION STRUCTURE
+// Extended settings for filtering and operations
+// ============================================================================
+typedef struct {
+    ScanMode scan_mode;
+    DirectoryList directories;
+    ExclusionList exclusions;
+    SizeFilter size_filter;
+    ExtensionFilter ext_filter;
+    OperationOptions options;
+    char log_file[MAX_PATH_LENGTH];      // Path to log file
+    char backup_folder[MAX_PATH_LENGTH]; // Path for safe deleted files
+} AdvancedConfig;
+
+// ============================================================================
 // SCAN CONFIGURATION STRUCTURE
-// Combines all settings for scan operation
+// Combines all settings for scan operation (DEPRECATED - use AdvancedConfig)
 // ============================================================================
 typedef struct {
     ScanMode scan_mode;
@@ -123,6 +167,8 @@ typedef struct {
     int files_scanned;
     int current_percent;
     bool is_complete;
+    int files_per_second;           // Scan speed
+    int estimated_seconds_remaining; // ETA
 } ProgressInfo;
 
 // ============================================================================
@@ -157,7 +203,44 @@ void free_duplicate_results(DuplicateResults* results);
 // ============================================================================
 int remove_duplicates_keep_first(DuplicateResults* results);
 int move_duplicates(DuplicateResults* results, const char* dest_folder);
+int move_all_duplicates_organized(DuplicateResults* results, const char* dest_folder);
 int create_hard_links(DuplicateResults* results);
+
+// ============================================================================
+// FUNCTION PROTOTYPES - QOL Features: Logging
+// ============================================================================
+void init_logger(const char* log_file);
+void log_operation(const char* format, ...);
+void close_logger(void);
+
+// ============================================================================
+// FUNCTION PROTOTYPES - QOL Features: Filtering
+// ============================================================================
+bool should_process_file(const char* filename, const AdvancedConfig* config);
+void init_size_filter(SizeFilter* filter, long long min_bytes, long long max_bytes);
+void init_extension_filter(ExtensionFilter* filter, bool is_whitelist);
+bool add_extension(ExtensionFilter* filter, const char* ext);
+bool matches_extension_filter(const char* filename, const ExtensionFilter* filter);
+
+// ============================================================================
+// FUNCTION PROTOTYPES - QOL Features: Export
+// ============================================================================
+bool export_duplicates_csv(const DuplicateResults* results, const char* filename);
+bool export_duplicates_txt(const DuplicateResults* results, const char* filename);
+long long calculate_savings(const DuplicateResults* results);
+
+// ============================================================================
+// FUNCTION PROTOTYPES - QOL Features: Safe Operations
+// ============================================================================
+int remove_duplicates_safe(DuplicateResults* results, const char* backup_folder, bool dry_run);
+int move_duplicates_safe(DuplicateResults* results, const char* dest_folder, const char* backup_folder, bool dry_run);
+
+// ============================================================================
+// FUNCTION PROTOTYPES - QOL Features: Configuration
+// ============================================================================
+bool load_config_file(const char* config_file, AdvancedConfig* config);
+bool save_config_file(const char* config_file, const AdvancedConfig* config);
+void init_advanced_config(AdvancedConfig* config);
 
 // ============================================================================
 // FUNCTION PROTOTYPES - Utility Functions

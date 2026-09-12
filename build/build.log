@@ -1,0 +1,477 @@
+action.c: In function 'move_all_duplicates_organized':
+action.c:179:58: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  179 |             snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s", dest_folder, subfolder_name);
+      |                                                          ^
+action.c:179:13: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  179 |             snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s", dest_folder, subfolder_name);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:182:66: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                                                                  ^
+action.c:182:59: note: directive argument in the range [1, 9999]
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                                                           ^~~~~~~~~~~
+action.c:182:21: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:201:55: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  201 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", group_dest, filename);
+      |                                                       ^~
+action.c:201:13: note: 'snprintf' output between 2 and 8192 bytes into a destination of size 4096
+  201 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", group_dest, filename);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:218:67: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                                                                   ^~
+action.c:218:62: note: directive argument in the range [1, 9999]
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                                                              ^~~~~~~~~~~
+action.c:218:25: note: 'snprintf' output between 4 and 8197 bytes into a destination of size 4096
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:213:67: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                                                                   ^~                    ~~~~~~~~~
+action.c:213:62: note: directive argument in the range [1, 9999]
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                                                              ^~~~~~~~~~~~~
+action.c:213:25: note: 'snprintf' output 4 or more bytes (assuming 8197) into a destination of size 4096
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'DeleteByIndexDlgProc':
+gui_win32.c:293:70: error: 'GWL_USERDATA' undeclared (first use in this function); did you mean 'GWLP_USERDATA'?
+  293 |     DbiDialogData* d = (DbiDialogData*)(LONG_PTR)GetWindowLong(hwnd, GWL_USERDATA);
+      |                                                                      ^~~~~~~~~~~~
+      |                                                                      GWLP_USERDATA
+gui_win32.c:293:70: note: each undeclared identifier is reported only once for each function it appears in
+features.c: In function 'remove_duplicates_safe':
+features.c:395:63: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  395 |                 snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s", backup_folder, filename);
+      |                                                               ^
+features.c:395:17: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  395 |                 snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s", backup_folder, filename);
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:411:75: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                                                                           ^
+features.c:411:68: note: directive argument in the range [1, 9999]
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                                                                    ^~~~~~~~~~~
+features.c:411:29: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:406:75: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                                                                           ^
+features.c:406:68: note: directive argument in the range [1, 9999]
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                                                                    ^~~~~~~~~~~~~
+features.c:406:29: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c: In function 'move_duplicates_safe':
+features.c:459:57: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  459 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", dest_folder, filename);
+      |                                                         ^
+features.c:459:13: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  459 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", dest_folder, filename);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:476:69: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                                                                     ^
+features.c:476:62: note: directive argument in the range [1, 9999]
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                                                              ^~~~~~~~~~~
+features.c:476:25: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:471:69: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                                                                     ^
+features.c:471:62: note: directive argument in the range [1, 9999]
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                                                              ^~~~~~~~~~~~~
+features.c:471:25: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c: In function 'move_all_duplicates_organized':
+action.c:179:58: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  179 |             snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s", dest_folder, subfolder_name);
+      |                                                          ^
+action.c:179:13: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  179 |             snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s", dest_folder, subfolder_name);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:182:66: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                                                                  ^
+action.c:182:59: note: directive argument in the range [1, 9999]
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                                                           ^~~~~~~~~~~
+action.c:182:21: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:201:55: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  201 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", group_dest, filename);
+      |                                                       ^~
+action.c:201:13: note: 'snprintf' output between 2 and 8192 bytes into a destination of size 4096
+  201 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", group_dest, filename);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:218:67: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                                                                   ^~
+action.c:218:62: note: directive argument in the range [1, 9999]
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                                                              ^~~~~~~~~~~
+action.c:218:25: note: 'snprintf' output between 4 and 8197 bytes into a destination of size 4096
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:213:67: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                                                                   ^~                    ~~~~~~~~~
+action.c:213:62: note: directive argument in the range [1, 9999]
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                                                              ^~~~~~~~~~~~~
+action.c:213:25: note: 'snprintf' output 4 or more bytes (assuming 8197) into a destination of size 4096
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'DbiRepopulateList':
+gui_win32.c:167:37: warning: '%d' directive output may be truncated writing between 1 and 10 bytes into a region of size 8 [-Wformat-truncation=]
+  167 |         snprintf(num, sizeof(num), "%d", j + 1);
+      |                                     ^~
+gui_win32.c:167:36: note: directive argument in the range [1, 2147483647]
+  167 |         snprintf(num, sizeof(num), "%d", j + 1);
+      |                                    ^~~~
+gui_win32.c:167:9: note: 'snprintf' output between 2 and 11 bytes into a destination of size 8
+  167 |         snprintf(num, sizeof(num), "%d", j + 1);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'DeleteByIndexDlgProc':
+gui_win32.c:326:63: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 455 and 474 [-Wformat-truncation=]
+  326 |                     "Group %d  --  %d identical copies  --  \"%s\"  (%s each)",
+      |                                                               ^~
+gui_win32.c:325:17: note: 'snprintf' output between 49 and 4194 bytes into a destination of size 512
+  325 |                 snprintf(entry, sizeof(entry),
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  326 |                     "Group %d  --  %d identical copies  --  \"%s\"  (%s each)",
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  327 |                     i + 1, g->count, sample, sz);
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'OnMove':
+gui_win32.c:977:71: warning: '%s' directive output may be truncated writing up to 259 bytes into a region of size between 217 and 227 [-Wformat-truncation=]
+  977 |             snprintf(msg, sizeof(msg), "Moved %d duplicate file(s) to %s\r\n", moved, path);
+      |                                                                       ^~              ~~~~
+gui_win32.c:977:13: note: 'snprintf' output between 32 and 301 bytes into a destination of size 256
+  977 |             snprintf(msg, sizeof(msg), "Moved %d duplicate file(s) to %s\r\n", moved, path);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'OnMoveAll':
+gui_win32.c:1041:47: warning: '%s' directive output may be truncated writing up to 259 bytes into a region of size between 215 and 225 [-Wformat-truncation=]
+ 1041 |              "Moved %d duplicate file(s) into %s\r\n", moved, dest);
+      |                                               ^~              ~~~~
+gui_win32.c:1040:5: note: 'snprintf' output between 34 and 303 bytes into a destination of size 256
+ 1040 |     snprintf(msg, sizeof(msg),
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1041 |              "Moved %d duplicate file(s) into %s\r\n", moved, dest);
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c: In function 'remove_duplicates_safe':
+features.c:395:63: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  395 |                 snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s", backup_folder, filename);
+      |                                                               ^
+features.c:395:17: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  395 |                 snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s", backup_folder, filename);
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:411:75: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                                                                           ^
+features.c:411:68: note: directive argument in the range [1, 9999]
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                                                                    ^~~~~~~~~~~
+features.c:411:29: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:406:75: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                                                                           ^
+features.c:406:68: note: directive argument in the range [1, 9999]
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                                                                    ^~~~~~~~~~~~~
+features.c:406:29: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c: In function 'move_duplicates_safe':
+features.c:459:57: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  459 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", dest_folder, filename);
+      |                                                         ^
+features.c:459:13: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  459 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", dest_folder, filename);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:476:69: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                                                                     ^
+features.c:476:62: note: directive argument in the range [1, 9999]
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                                                              ^~~~~~~~~~~
+features.c:476:25: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:471:69: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                                                                     ^
+features.c:471:62: note: directive argument in the range [1, 9999]
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                                                              ^~~~~~~~~~~~~
+features.c:471:25: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c: In function 'move_all_duplicates_organized':
+action.c:179:58: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  179 |             snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s", dest_folder, subfolder_name);
+      |                                                          ^
+action.c:179:13: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  179 |             snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s", dest_folder, subfolder_name);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:182:66: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                                                                  ^
+action.c:182:59: note: directive argument in the range [1, 9999]
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                                                           ^~~~~~~~~~~
+action.c:182:21: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:201:55: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  201 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", group_dest, filename);
+      |                                                       ^~
+action.c:201:13: note: 'snprintf' output between 2 and 8192 bytes into a destination of size 4096
+  201 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", group_dest, filename);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:218:67: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                                                                   ^~
+action.c:218:62: note: directive argument in the range [1, 9999]
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                                                              ^~~~~~~~~~~
+action.c:218:25: note: 'snprintf' output between 4 and 8197 bytes into a destination of size 4096
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:213:67: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                                                                   ^~                    ~~~~~~~~~
+action.c:213:62: note: directive argument in the range [1, 9999]
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                                                              ^~~~~~~~~~~~~
+action.c:213:25: note: 'snprintf' output 4 or more bytes (assuming 8197) into a destination of size 4096
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'DbiRepopulateList':
+gui_win32.c:167:37: warning: '%d' directive output may be truncated writing between 1 and 10 bytes into a region of size 8 [-Wformat-truncation=]
+  167 |         snprintf(num, sizeof(num), "%d", j + 1);
+      |                                     ^~
+gui_win32.c:167:36: note: directive argument in the range [1, 2147483647]
+  167 |         snprintf(num, sizeof(num), "%d", j + 1);
+      |                                    ^~~~
+gui_win32.c:167:9: note: 'snprintf' output between 2 and 11 bytes into a destination of size 8
+  167 |         snprintf(num, sizeof(num), "%d", j + 1);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'DeleteByIndexDlgProc':
+gui_win32.c:326:63: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 455 and 474 [-Wformat-truncation=]
+  326 |                     "Group %d  --  %d identical copies  --  \"%s\"  (%s each)",
+      |                                                               ^~
+gui_win32.c:325:17: note: 'snprintf' output between 49 and 4194 bytes into a destination of size 512
+  325 |                 snprintf(entry, sizeof(entry),
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  326 |                     "Group %d  --  %d identical copies  --  \"%s\"  (%s each)",
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  327 |                     i + 1, g->count, sample, sz);
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'OnMove':
+gui_win32.c:977:71: warning: '%s' directive output may be truncated writing up to 259 bytes into a region of size between 217 and 227 [-Wformat-truncation=]
+  977 |             snprintf(msg, sizeof(msg), "Moved %d duplicate file(s) to %s\r\n", moved, path);
+      |                                                                       ^~              ~~~~
+gui_win32.c:977:13: note: 'snprintf' output between 32 and 301 bytes into a destination of size 256
+  977 |             snprintf(msg, sizeof(msg), "Moved %d duplicate file(s) to %s\r\n", moved, path);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'OnMoveAll':
+gui_win32.c:1041:47: warning: '%s' directive output may be truncated writing up to 259 bytes into a region of size between 215 and 225 [-Wformat-truncation=]
+ 1041 |              "Moved %d duplicate file(s) into %s\r\n", moved, dest);
+      |                                               ^~              ~~~~
+gui_win32.c:1040:5: note: 'snprintf' output between 34 and 303 bytes into a destination of size 256
+ 1040 |     snprintf(msg, sizeof(msg),
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1041 |              "Moved %d duplicate file(s) into %s\r\n", moved, dest);
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c: In function 'remove_duplicates_safe':
+features.c:395:63: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  395 |                 snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s", backup_folder, filename);
+      |                                                               ^
+features.c:395:17: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  395 |                 snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s", backup_folder, filename);
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:411:75: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                                                                           ^
+features.c:411:68: note: directive argument in the range [1, 9999]
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                                                                    ^~~~~~~~~~~
+features.c:411:29: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:406:75: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                                                                           ^
+features.c:406:68: note: directive argument in the range [1, 9999]
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                                                                    ^~~~~~~~~~~~~
+features.c:406:29: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c: In function 'move_duplicates_safe':
+features.c:459:57: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  459 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", dest_folder, filename);
+      |                                                         ^
+features.c:459:13: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  459 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", dest_folder, filename);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:476:69: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                                                                     ^
+features.c:476:62: note: directive argument in the range [1, 9999]
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                                                              ^~~~~~~~~~~
+features.c:476:25: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:471:69: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                                                                     ^
+features.c:471:62: note: directive argument in the range [1, 9999]
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                                                              ^~~~~~~~~~~~~
+features.c:471:25: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c: In function 'move_all_duplicates_organized':
+action.c:179:58: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  179 |             snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s", dest_folder, subfolder_name);
+      |                                                          ^
+action.c:179:13: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  179 |             snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s", dest_folder, subfolder_name);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:182:66: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                                                                  ^
+action.c:182:59: note: directive argument in the range [1, 9999]
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                                                           ^~~~~~~~~~~
+action.c:182:21: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  182 |                     snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+      |                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:201:55: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  201 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", group_dest, filename);
+      |                                                       ^~
+action.c:201:13: note: 'snprintf' output between 2 and 8192 bytes into a destination of size 4096
+  201 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", group_dest, filename);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:218:67: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                                                                   ^~
+action.c:218:62: note: directive argument in the range [1, 9999]
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                                                              ^~~~~~~~~~~
+action.c:218:25: note: 'snprintf' output between 4 and 8197 bytes into a destination of size 4096
+  218 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+action.c:213:67: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 0 and 4095 [-Wformat-truncation=]
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                                                                   ^~                    ~~~~~~~~~
+action.c:213:62: note: directive argument in the range [1, 9999]
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                                                              ^~~~~~~~~~~~~
+action.c:213:25: note: 'snprintf' output 4 or more bytes (assuming 8197) into a destination of size 4096
+  213 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'DbiRepopulateList':
+gui_win32.c:167:37: warning: '%d' directive output may be truncated writing between 1 and 10 bytes into a region of size 8 [-Wformat-truncation=]
+  167 |         snprintf(num, sizeof(num), "%d", j + 1);
+      |                                     ^~
+gui_win32.c:167:36: note: directive argument in the range [1, 2147483647]
+  167 |         snprintf(num, sizeof(num), "%d", j + 1);
+      |                                    ^~~~
+gui_win32.c:167:9: note: 'snprintf' output between 2 and 11 bytes into a destination of size 8
+  167 |         snprintf(num, sizeof(num), "%d", j + 1);
+      |         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'DeleteByIndexDlgProc':
+gui_win32.c:326:63: warning: '%s' directive output may be truncated writing up to 4095 bytes into a region of size between 455 and 474 [-Wformat-truncation=]
+  326 |                     "Group %d  --  %d identical copies  --  \"%s\"  (%s each)",
+      |                                                               ^~
+gui_win32.c:325:17: note: 'snprintf' output between 49 and 4194 bytes into a destination of size 512
+  325 |                 snprintf(entry, sizeof(entry),
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  326 |                     "Group %d  --  %d identical copies  --  \"%s\"  (%s each)",
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  327 |                     i + 1, g->count, sample, sz);
+      |                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'OnMove':
+gui_win32.c:977:71: warning: '%s' directive output may be truncated writing up to 259 bytes into a region of size between 217 and 227 [-Wformat-truncation=]
+  977 |             snprintf(msg, sizeof(msg), "Moved %d duplicate file(s) to %s\r\n", moved, path);
+      |                                                                       ^~              ~~~~
+gui_win32.c:977:13: note: 'snprintf' output between 32 and 301 bytes into a destination of size 256
+  977 |             snprintf(msg, sizeof(msg), "Moved %d duplicate file(s) to %s\r\n", moved, path);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+gui_win32.c: In function 'OnMoveAll':
+gui_win32.c:1041:47: warning: '%s' directive output may be truncated writing up to 259 bytes into a region of size between 215 and 225 [-Wformat-truncation=]
+ 1041 |              "Moved %d duplicate file(s) into %s\r\n", moved, dest);
+      |                                               ^~              ~~~~
+gui_win32.c:1040:5: note: 'snprintf' output between 34 and 303 bytes into a destination of size 256
+ 1040 |     snprintf(msg, sizeof(msg),
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1041 |              "Moved %d duplicate file(s) into %s\r\n", moved, dest);
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c: In function 'remove_duplicates_safe':
+features.c:395:63: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  395 |                 snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s", backup_folder, filename);
+      |                                                               ^
+features.c:395:17: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  395 |                 snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s", backup_folder, filename);
+      |                 ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:411:75: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                                                                           ^
+features.c:411:68: note: directive argument in the range [1, 9999]
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                                                                    ^~~~~~~~~~~
+features.c:411:29: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  411 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d", backup_folder, filename, n);
+      |                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:406:75: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                                                                           ^
+features.c:406:68: note: directive argument in the range [1, 9999]
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                                                                    ^~~~~~~~~~~~~
+features.c:406:29: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  406 |                             snprintf(backup_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", backup_folder, base_name, n, ext);
+      |                             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c: In function 'move_duplicates_safe':
+features.c:459:57: warning: 'snprintf' output may be truncated before the last format character [-Wformat-truncation=]
+  459 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", dest_folder, filename);
+      |                                                         ^
+features.c:459:13: note: 'snprintf' output 2 or more bytes (assuming 4097) into a destination of size 4096
+  459 |             snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", dest_folder, filename);
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:476:69: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                                                                     ^
+features.c:476:62: note: directive argument in the range [1, 9999]
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                                                              ^~~~~~~~~~~
+features.c:476:25: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  476 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, filename, n);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+features.c:471:69: warning: '_' directive output may be truncated writing 1 byte into a region of size between 0 and 4095 [-Wformat-truncation=]
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                                                                     ^
+features.c:471:62: note: directive argument in the range [1, 9999]
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                                                              ^~~~~~~~~~~~~
+features.c:471:25: note: 'snprintf' output 4 or more bytes (assuming 4102) into a destination of size 4096
+  471 |                         snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", dest_folder, base_name, n, ext);
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

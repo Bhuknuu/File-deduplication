@@ -6,10 +6,102 @@
  * 2. Depth-First Search (DFS) 
  * 3. Recursion
  * 4. String Manipulation
- * 5. Hash Functions (FNV-1a)
+ * 5. Hash Functions (SHA-256 via CNG BCrypt API)
  */
 
 #include "common.h"
+#include <bcrypt.h>
+#pragma comment(lib, "Bcrypt.lib")
+
+// ============================================================================
+// CACHE IMPLEMENTATION
+// ============================================================================
+typedef struct CacheEntry {
+    char path[MAX_PATH_LENGTH];
+    long long size;
+    time_t modified;
+    char hash[HASH_LENGTH];
+    struct CacheEntry* next;
+} CacheEntry;
+
+#define CACHE_TABLE_SIZE 10007
+static CacheEntry* g_cache[CACHE_TABLE_SIZE] = {0};
+
+static unsigned int hash_path(const char* path) {
+    unsigned int hash = 5381;
+    int c;
+    while ((c = *path++))
+        hash = ((hash << 5) + hash) + c;
+    return hash % CACHE_TABLE_SIZE;
+}
+
+static void load_cache() {
+    FILE* f = fopen("dedup_cache.txt", "r");
+    if (!f) return;
+    char line[MAX_PATH_LENGTH + 256];
+    while (fgets(line, sizeof(line), f)) {
+        CacheEntry* entry = malloc(sizeof(CacheEntry));
+        if (!entry) break;
+        
+        char* p = strrchr(line, '\n'); if (p) *p = 0;
+        char* context = NULL;
+        
+        char* token = strtok_s(line, "|", &context);
+        if (!token) { free(entry); continue; }
+        strcpy_s(entry->path, MAX_PATH_LENGTH, token);
+        
+        token = strtok_s(NULL, "|", &context);
+        if (!token) { free(entry); continue; }
+        entry->size = atoll(token);
+        
+        token = strtok_s(NULL, "|", &context);
+        if (!token) { free(entry); continue; }
+        entry->modified = atoll(token);
+        
+        token = strtok_s(NULL, "|", &context);
+        if (!token) { free(entry); continue; }
+        strcpy_s(entry->hash, HASH_LENGTH, token);
+        
+        unsigned int h = hash_path(entry->path);
+        entry->next = g_cache[h];
+        g_cache[h] = entry;
+    }
+    fclose(f);
+}
+
+static bool get_cached_hash(const char* path, long long size, time_t modified, char* out_hash) {
+    unsigned int h = hash_path(path);
+    CacheEntry* entry = g_cache[h];
+    while (entry) {
+        if (strcmp(entry->path, path) == 0 && entry->size == size && entry->modified == modified) {
+            strcpy_s(out_hash, HASH_LENGTH, entry->hash);
+            return true;
+        }
+        entry = entry->next;
+    }
+    return false;
+}
+
+static void save_cache(FileInfo* files, int count) {
+    FILE* f = fopen("dedup_cache.txt", "w");
+    if (!f) return;
+    for (int i = 0; i < count; i++) {
+        fprintf(f, "%s|%lld|%lld|%s\n", files[i].path, files[i].size, (long long)files[i].modified, files[i].hash);
+    }
+    fclose(f);
+}
+
+static void free_cache() {
+    for (int i = 0; i < CACHE_TABLE_SIZE; i++) {
+        CacheEntry* entry = g_cache[i];
+        while (entry) {
+            CacheEntry* next = entry->next;
+            free(entry);
+            entry = next;
+        }
+        g_cache[i] = NULL;
+    }
+}
 
 // ============================================================================
 // DIRECTORY LIST INITIALIZATION
@@ -80,45 +172,115 @@ static time_t FileTimeToTimeT(const FILETIME* ft) {
 
 void compute_hash(const char* filename, char* output, ScanMode mode) {
     if (!filename || !output) {
-        if (output) strcpy(output, "ERROR_NULL");
+        if (output) strcpy_s(output, HASH_LENGTH, "ERROR_NULL");
         return;
     }
-    
-    FILE* file = fopen(filename, "rb");
-    if (!file) {
-        strcpy(output, "ERROR_OPEN");
+
+    BCRYPT_ALG_HANDLE hAlg = NULL;
+    BCRYPT_HASH_HANDLE hHash = NULL;
+    NTSTATUS status;
+
+    status = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, NULL, 0);
+    if (!BCRYPT_SUCCESS(status)) {
+        strcpy_s(output, HASH_LENGTH, "ERROR_ALGO");
         return;
     }
-    
-    // Determine bytes to hash
-    size_t bytes_to_hash = (mode == SCAN_QUICK) ? QUICK_HASH_SIZE : 0;
-    
-    // Initialize FNV-1a
-    uint64_t hash = FNV_OFFSET_BASIS;
-    unsigned char buffer[64];
-    size_t total_read = 0;
-    size_t bytes_read;
-    
-    // Read and hash file in chunks
-    while ((bytes_read = fread(buffer, 1, sizeof(buffer), file)) > 0) {
-        // Stop if we've read enough (quick mode)
-        if (bytes_to_hash > 0 && total_read >= bytes_to_hash) {
-            break;
-        }
-        
-        // FNV-1a: XOR then multiply
-        for (size_t i = 0; i < bytes_read; i++) {
-            hash ^= buffer[i];
-            hash *= FNV_PRIME;
-        }
-        
-        total_read += bytes_read;
+
+    DWORD cbHashObject = 0, cbData = 0;
+    status = BCryptGetProperty(hAlg, BCRYPT_OBJECT_LENGTH,
+                               (PBYTE)&cbHashObject, sizeof(DWORD), &cbData, 0);
+    if (!BCRYPT_SUCCESS(status)) {
+        BCryptCloseAlgorithmProvider(hAlg, 0);
+        strcpy_s(output, HASH_LENGTH, "ERROR_PROP");
+        return;
     }
-    
-    fclose(file);
-    
-    // Convert to hexadecimal string
-    sprintf(output, "%016llx", (unsigned long long)hash);
+
+    PBYTE pbHashObject = (PBYTE)malloc(cbHashObject);
+    if (!pbHashObject) {
+        BCryptCloseAlgorithmProvider(hAlg, 0);
+        strcpy_s(output, HASH_LENGTH, "ERROR_MEM");
+        return;
+    }
+
+    status = BCryptCreateHash(hAlg, &hHash, pbHashObject, cbHashObject, NULL, 0, 0);
+    if (!BCRYPT_SUCCESS(status)) {
+        free(pbHashObject);
+        BCryptCloseAlgorithmProvider(hAlg, 0);
+        strcpy_s(output, HASH_LENGTH, "ERROR_HASH");
+        return;
+    }
+
+    HANDLE hFile = CreateFileA(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (hFile == INVALID_HANDLE_VALUE) {
+        BCryptDestroyHash(hHash);
+        free(pbHashObject);
+        BCryptCloseAlgorithmProvider(hAlg, 0);
+        strcpy_s(output, HASH_LENGTH, "ERROR_OPEN");
+        return;
+    }
+
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(hFile, &fileSize)) {
+        CloseHandle(hFile);
+        BCryptDestroyHash(hHash);
+        free(pbHashObject);
+        BCryptCloseAlgorithmProvider(hAlg, 0);
+        strcpy_s(output, HASH_LENGTH, "ERROR_SIZE");
+        return;
+    }
+
+    bool hash_error = false;
+    size_t bytes_to_hash = (mode == SCAN_QUICK) ? QUICK_HASH_SIZE : (size_t)fileSize.QuadPart;
+    if (bytes_to_hash > (size_t)fileSize.QuadPart) {
+        bytes_to_hash = (size_t)fileSize.QuadPart;
+    }
+
+    if (bytes_to_hash > 0) {
+        HANDLE hMap = CreateFileMappingA(hFile, NULL, PAGE_READONLY, 0, 0, NULL);
+        if (hMap) {
+            // Map only the bytes we need to hash
+            void* pMap = MapViewOfFile(hMap, FILE_MAP_READ, 0, 0, bytes_to_hash);
+            if (pMap) {
+                status = BCryptHashData(hHash, (PUCHAR)pMap, (ULONG)bytes_to_hash, 0);
+                if (!BCRYPT_SUCCESS(status)) {
+                    hash_error = true;
+                }
+                UnmapViewOfFile(pMap);
+            } else {
+                hash_error = true;
+            }
+            CloseHandle(hMap);
+        } else {
+            hash_error = true;
+        }
+    }
+
+    CloseHandle(hFile);
+
+    if (hash_error) {
+        BCryptDestroyHash(hHash);
+        free(pbHashObject);
+        BCryptCloseAlgorithmProvider(hAlg, 0);
+        strcpy_s(output, HASH_LENGTH, "ERROR_READ");
+        return;
+    }
+
+    BYTE hash[32]; /* SHA-256 produces 32 bytes */
+    status = BCryptFinishHash(hHash, hash, sizeof(hash), 0);
+    BCryptDestroyHash(hHash);
+    free(pbHashObject);
+    BCryptCloseAlgorithmProvider(hAlg, 0);
+
+    if (!BCRYPT_SUCCESS(status)) {
+        strcpy_s(output, HASH_LENGTH, "ERROR_FIN");
+        return;
+    }
+
+    /* Convert 32 bytes to 64-character hex string + null terminator */
+    for (int i = 0; i < 32; i++) {
+        sprintf(output + i * 2, "%02x", hash[i]);
+    }
+    output[64] = '\0';
 }
 
 static int scan_directory_internal(
@@ -132,7 +294,13 @@ static int scan_directory_internal(
 ) {
     // Build search pattern
     char search_path[MAX_PATH_LENGTH];
-    int len = snprintf(search_path, MAX_PATH_LENGTH, "%s\\*", path);
+    size_t path_len = strlen(path);
+    int len;
+    if (path_len > 0 && (path[path_len - 1] == '\\' || path[path_len - 1] == '/')) {
+        len = snprintf(search_path, MAX_PATH_LENGTH, "%s*", path);
+    } else {
+        len = snprintf(search_path, MAX_PATH_LENGTH, "%s\\*", path);
+    }
     
     if (len >= MAX_PATH_LENGTH - 1) {
         return current_count;
@@ -161,6 +329,11 @@ static int scan_directory_internal(
             continue;
         }
         
+        // Skip reparse points (symlinks, junctions) to avoid infinite loops
+        if (ffd.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) {
+            continue;
+        }
+        
         // Build full path
         char full_path[MAX_PATH_LENGTH];
         len = snprintf(full_path, MAX_PATH_LENGTH, "%s\\%s", path, ffd.cFileName);
@@ -184,11 +357,6 @@ static int scan_directory_internal(
                 break;
             }
             
-            // Update progress
-            EnterCriticalSection(&g_dataLock);
-            g_progress.files_scanned++;
-            LeaveCriticalSection(&g_dataLock);
-            
             // Store path
             strncpy(files[count].path, full_path, MAX_PATH_LENGTH - 1);
             files[count].path[MAX_PATH_LENGTH - 1] = '\0';
@@ -200,8 +368,7 @@ static int scan_directory_internal(
             // Get modification time
             files[count].modified = FileTimeToTimeT(&ffd.ftLastWriteTime);
             
-            // Compute hash
-            compute_hash(full_path, files[count].hash, mode);
+            // Hashing is now deferred to the parallel processing phase.
             
             count++;
         }
@@ -212,6 +379,24 @@ static int scan_directory_internal(
     return count;
 }
 
+
+typedef struct {
+    FileInfo* file;
+    ScanMode mode;
+} HashWorkContext;
+
+static volatile LONG g_pending_hashes = 0;
+
+static void CALLBACK HashWorkCallback(PTP_CALLBACK_INSTANCE Instance, PVOID Context) {
+    (void)Instance;
+    HashWorkContext* ctx = (HashWorkContext*)Context;
+    
+    if (!get_cached_hash(ctx->file->path, ctx->file->size, ctx->file->modified, ctx->file->hash)) {
+        compute_hash(ctx->file->path, ctx->file->hash, ctx->mode);
+    }
+    
+    InterlockedDecrement(&g_pending_hashes);
+}
 
 int scan_directories(const ScanConfig* config, FileInfo* files, int max_files) {
     if (!config || !files || max_files <= 0) return 0;
@@ -225,7 +410,7 @@ int scan_directories(const ScanConfig* config, FileInfo* files, int max_files) {
     
     int total = 0;
     
-    // Scan each directory
+    // Scan each directory (DFS phase)
     for (int i = 0; i < config->directories.count && total < max_files; i++) {
         total = scan_directory_internal(
             config->directories.paths[i],
@@ -238,10 +423,64 @@ int scan_directories(const ScanConfig* config, FileInfo* files, int max_files) {
         );
     }
     
+    if (total > 0) {
+        // Parallel Hashing Phase
+        load_cache();
+        
+        HashWorkContext* contexts = malloc(total * sizeof(HashWorkContext));
+        if (contexts) {
+            g_pending_hashes = total;
+            
+            for (int i = 0; i < total; i++) {
+                contexts[i].file = &files[i];
+                contexts[i].mode = config->scan_mode;
+                if (!TrySubmitThreadpoolCallback(HashWorkCallback, &contexts[i], NULL)) {
+                    // P4: Fallback -- hash synchronously on threadpool failure
+                    if (!get_cached_hash(contexts[i].file->path,
+                                         contexts[i].file->size,
+                                         contexts[i].file->modified,
+                                         contexts[i].file->hash)) {
+                        compute_hash(contexts[i].file->path,
+                                     contexts[i].file->hash,
+                                     config->scan_mode);
+                    }
+                    InterlockedDecrement(&g_pending_hashes);
+                }
+            }
+            
+            // Wait for all to complete
+            while (InterlockedAdd(&g_pending_hashes, 0) > 0) {
+                Sleep(50);
+                LONG pending = InterlockedAdd(&g_pending_hashes, 0);
+                EnterCriticalSection(&g_dataLock);
+                g_progress.files_scanned = total - pending;
+                g_progress.current_percent = (total > 0) ? ((total - pending) * 100 / total) : 0;
+                LeaveCriticalSection(&g_dataLock);
+            }
+            
+            save_cache(files, total);
+            free(contexts);
+        } else {
+            // Fallback to sequential if malloc fails
+            for (int i = 0; i < total; i++) {
+                if (!get_cached_hash(files[i].path, files[i].size, files[i].modified, files[i].hash)) {
+                    compute_hash(files[i].path, files[i].hash, config->scan_mode);
+                }
+                EnterCriticalSection(&g_dataLock);
+                g_progress.files_scanned = i + 1;
+                LeaveCriticalSection(&g_dataLock);
+            }
+            save_cache(files, total);
+        }
+        
+        free_cache();
+    }
+    
     // Mark complete
     EnterCriticalSection(&g_dataLock);
     g_progress.is_complete = true;
     g_progress.current_percent = 100;
+    g_progress.files_scanned = total;
     LeaveCriticalSection(&g_dataLock);
     
     return total;
@@ -252,8 +491,8 @@ int scan_directories(const ScanConfig* config, FileInfo* files, int max_files) {
 // ============================================================================
 const char* get_scan_mode_name(ScanMode mode) {
     switch (mode) {
-        case SCAN_QUICK:     return "FNV-1a (1MB)";
-        case SCAN_THOROUGH:  return "FNV-1a (Full)";
+        case SCAN_QUICK:     return "SHA-256 (1MB)";
+        case SCAN_THOROUGH:  return "SHA-256 (Full)";
         default:             return "Unknown";
     }
 }

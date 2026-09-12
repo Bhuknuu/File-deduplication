@@ -1,0 +1,96 @@
+# File Deduplication System - Configuration File
+# Copy this file and modify settings as needed
+# Load with: load_config_file("dedup.cfg", &config);
+
+# ============================================================================
+# Scan Settings
+# ============================================================================
+
+# Scan Mode: 0 = QUICK (hash first 1MB), 1 = THOROUGH (full file hash)
+scan_mode=0
+
+# Skip hidden files (Windows attribute)
+skip_hidden=true
+
+# Skip system files (Windows attribute)
+skip_system=true
+
+# ============================================================================
+# Filtering Settings
+# ============================================================================
+
+# Minimum file size in bytes (0 = no minimum)
+# Examples: 1048576 = 1MB, 10485760 = 10MB
+min_size=0
+
+# Maximum file size in bytes (-1 = no maximum)
+# Examples: 104857600 = 100MB, 1073741824 = 1GB
+max_size=-1
+
+# ============================================================================
+# Operation Settings
+# ============================================================================
+
+# Dry-run mode: true = preview only, false = actually execute
+# ALWAYS test with dry_run=true first!
+dry_run=true
+
+# Safe deletion: true = move to backup folder, false = permanent delete
+safe_delete=true
+
+# Log all operations: true = save to log file, false = no logging
+log_operations=true
+
+# ============================================================================
+# File Paths
+# ============================================================================
+
+# Log file path (will be created if doesn't exist)
+log_file=dedup_operations.log
+
+# Backup folder for deleted files
+# Files moved here instead of being permanently deleted
+backup_folder=C:\Users\Public\Dedup_Backup
+
+# ============================================================================
+# USAGE EXAMPLES
+# ============================================================================
+
+# EXAMPLE 1: Safe Testing (Recommended)
+# ---------
+# dry_run=true
+# safe_delete=true
+# log_operations=true
+# Result: Preview what would happen, see logs, no changes made
+
+# EXAMPLE 2: Safe Production Use
+# ---------
+# dry_run=false
+# safe_delete=true
+# log_operations=true
+# Result: Actual execution but reversible, everything logged
+
+# EXAMPLE 3: Large File Cleanup
+# ---------
+# min_size=1048576      # Only files >= 1MB
+# max_size=104857600    # Only files <= 100MB
+# Result: Focus on significant duplicates, skip tiny files
+
+# EXAMPLE 4: Performance Focused
+# ---------
+# scan_mode=0           # QUICK - hash only first 1MB
+# skip_hidden=true
+# skip_system=true
+# Result: Faster scanning, skip unimportant files
+
+# ============================================================================
+# NOTES
+# ============================================================================
+
+# 1. Always run with dry_run=true FIRST to preview changes
+# 2. Backup folder should be on different drive if possible
+# 3. Log files accumulate (append mode) - rotate them periodically
+# 4. File sizes are in BYTES: 1MB=1048576, 1GB=1073741824
+# 5. Paths: use backslashes (C:\Folder\) or forward slashes (C:/Folder/)
+# 6. Comments: use # at start of line
+# 7. Boolean values: true or false (lowercase)

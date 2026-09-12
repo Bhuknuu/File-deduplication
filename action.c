@@ -10,8 +10,9 @@ bool ensure_directory_exists(const char* path) {
         return (attr & FILE_ATTRIBUTE_DIRECTORY) != 0;
     }
     
-    // Try to create directory
-    return CreateDirectoryA(path, NULL) != 0;
+    // Try to create directory recursively
+    int res = SHCreateDirectoryExA(NULL, path, NULL);
+    return (res == ERROR_SUCCESS || res == ERROR_ALREADY_EXISTS);
 }
 
 
@@ -86,27 +87,34 @@ int move_duplicates(DuplicateResults* results, const char* dest_folder) {
                     
                     // Try base_1.ext, base_2.ext, ...
                     for (int n = 1; n < 10000; n++) {
-                        snprintf(dest_path, MAX_PATH_LENGTH, 
+                        int written = snprintf(dest_path, MAX_PATH_LENGTH, 
                                 "%s\\%s_%d%s", 
                                 dest_folder, base_name, n, ext);
-                        
-                        if (GetFileAttributesA(dest_path) == 
-                            INVALID_FILE_ATTRIBUTES) {
-                            break;  // Found available name
+                        // Verify no truncation occurred
+                        if (written > 0 && written < MAX_PATH_LENGTH) {
+                            if (GetFileAttributesA(dest_path) == 
+                                INVALID_FILE_ATTRIBUTES) {
+                                break;  // Found available name
+                            }
                         }
                     }
+                    if (GetFileAttributesA(dest_path) != INVALID_FILE_ATTRIBUTES) continue;
                 } else {
                     // No extension
                     for (int n = 1; n < 10000; n++) {
-                        snprintf(dest_path, MAX_PATH_LENGTH, 
+                        int written = snprintf(dest_path, MAX_PATH_LENGTH, 
                                 "%s\\%s_%d", 
                                 dest_folder, filename, n);
+                        // Verify no truncation occurred
+                        if (written > 0 && written < MAX_PATH_LENGTH) {
                         
-                        if (GetFileAttributesA(dest_path) == 
-                            INVALID_FILE_ATTRIBUTES) {
-                            break;
+                            if (GetFileAttributesA(dest_path) == 
+                                INVALID_FILE_ATTRIBUTES) {
+                                break;
+                            }
                         }
                     }
+                    if (GetFileAttributesA(dest_path) != INVALID_FILE_ATTRIBUTES) continue;
                 }
             }
             
@@ -117,6 +125,108 @@ int move_duplicates(DuplicateResults* results, const char* dest_folder) {
         }
     }
     
+    return moved;
+}
+
+// ============================================================================
+// MOVE ALL DUPLICATES ORGANIZED
+//
+// Rules:
+//   - If a group has exactly 2 files (one original + one duplicate):
+//     move the duplicate flat into dest_folder.
+//   - If a group has 3+ files (one original + 2+ duplicates):
+//     create a subfolder named after the original filename (without extension),
+//     move all duplicates there.
+//   - Collision handling: append _1, _2, etc. in all cases.
+//
+// The "original" (files[0]) is always kept in place.
+// RETURNS: Total number of files moved.
+// ============================================================================
+int move_all_duplicates_organized(DuplicateResults* results, const char* dest_folder) {
+    if (!results || !dest_folder || results->count == 0) return 0;
+
+    if (!ensure_directory_exists(dest_folder)) return 0;
+
+    int moved = 0;
+
+    for (int i = 0; i < results->count; i++) {
+        DuplicateGroup* group = &results->groups[i];
+        if (group->count < 2) continue;
+
+        // Determine where duplicates land
+        char group_dest[MAX_PATH_LENGTH];
+        int duplicate_count = group->count - 1;  // files[0] is kept
+
+        if (duplicate_count > 1) {
+            // Many duplicates: build a named subfolder from the original's filename
+            const char* orig_name = strrchr(group->files[0].path, '\\');
+            orig_name = orig_name ? orig_name + 1 : group->files[0].path;
+
+            // Strip extension for subfolder name
+            char subfolder_name[MAX_PATH_LENGTH];
+            const char* ext = strrchr(orig_name, '.');
+            if (ext) {
+                size_t base_len = (size_t)(ext - orig_name);
+                if (base_len >= MAX_PATH_LENGTH) base_len = MAX_PATH_LENGTH - 1;
+                strncpy(subfolder_name, orig_name, base_len);
+                subfolder_name[base_len] = '\0';
+            } else {
+                strncpy(subfolder_name, orig_name, MAX_PATH_LENGTH - 1);
+                subfolder_name[MAX_PATH_LENGTH - 1] = '\0';
+            }
+
+            // Build subfolder path, handle name collision with existing folders
+            snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s", dest_folder, subfolder_name);
+            if (GetFileAttributesA(group_dest) != INVALID_FILE_ATTRIBUTES) {
+                for (int n = 1; n < 10000; n++) {
+                    snprintf(group_dest, MAX_PATH_LENGTH, "%s\\%s_%d", dest_folder, subfolder_name, n);
+                    if (GetFileAttributesA(group_dest) == INVALID_FILE_ATTRIBUTES) break;
+                }
+            }
+
+            if (!ensure_directory_exists(group_dest)) continue;
+        } else {
+            // Single duplicate: goes flat into dest_folder
+            strncpy(group_dest, dest_folder, MAX_PATH_LENGTH - 1);
+            group_dest[MAX_PATH_LENGTH - 1] = '\0';
+        }
+
+        // Move each duplicate (skip files[0] = the original to keep)
+        for (int j = 1; j < group->count; j++) {
+            const char* src_path = group->files[j].path;
+            const char* filename = strrchr(src_path, '\\');
+            filename = filename ? filename + 1 : src_path;
+
+            char dest_path[MAX_PATH_LENGTH];
+            snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s", group_dest, filename);
+
+            // Collision resolution
+            if (GetFileAttributesA(dest_path) != INVALID_FILE_ATTRIBUTES) {
+                char base_name[MAX_PATH_LENGTH];
+                const char* fext = strrchr(filename, '.');
+                if (fext) {
+                    size_t base_len = (size_t)(fext - filename);
+                    if (base_len >= MAX_PATH_LENGTH) base_len = MAX_PATH_LENGTH - 1;
+                    strncpy(base_name, filename, base_len);
+                    base_name[base_len] = '\0';
+                    for (int n = 1; n < 10000; n++) {
+                        snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d%s", group_dest, base_name, n, fext);
+                        if (GetFileAttributesA(dest_path) == INVALID_FILE_ATTRIBUTES) break;
+                    }
+                } else {
+                    for (int n = 1; n < 10000; n++) {
+                        snprintf(dest_path, MAX_PATH_LENGTH, "%s\\%s_%d", group_dest, filename, n);
+                        if (GetFileAttributesA(dest_path) == INVALID_FILE_ATTRIBUTES) break;
+                    }
+                }
+            }
+
+            if (MoveFileA(src_path, dest_path)) {
+                moved++;
+            }
+        }
+    }
+
     return moved;
 }
 
@@ -170,15 +280,23 @@ int create_hard_links(DuplicateResults* results) {
         for (int j = 1; j < group->count; j++) {
             const char* target = group->files[j].path;
             
-            // Delete existing file
-            DeleteFileA(target);
+            // Build temp path
+            char temp_path[MAX_PATH_LENGTH];
+            int len = snprintf(temp_path, MAX_PATH_LENGTH, "%s.dedup_tmp_%d_%d", target, i, j);
+            if (len >= MAX_PATH_LENGTH - 1) continue;
+            
+            // Rename to temp
+            if (!MoveFileA(target, temp_path)) continue;
             
             // Create hard link
             // CreateHardLinkA(link_name, existing_file, security_attributes)
             if (CreateHardLinkA(target, source, NULL)) {
+                DeleteFileA(temp_path);
                 link_count++;
+            } else {
+                // Restore original
+                MoveFileA(temp_path, target);
             }
-            // Fails if different drives, not NTFS, etc.
         }
     }
     
