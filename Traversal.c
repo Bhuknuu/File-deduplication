@@ -14,70 +14,84 @@
 #pragma comment(lib, "Bcrypt.lib")
 
 // ============================================================================
-// CACHE IMPLEMENTATION
+// CACHE IMPLEMENTATION (Sorted Array + Binary Search)
 // ============================================================================
-typedef struct CacheEntry {
+typedef struct {
     char path[MAX_PATH_LENGTH];
     long long size;
     time_t modified;
     char hash[HASH_LENGTH];
-    struct CacheEntry* next;
 } CacheEntry;
 
-#define CACHE_TABLE_SIZE 10007
-static CacheEntry* g_cache[CACHE_TABLE_SIZE] = {0};
+static CacheEntry* g_cache = NULL;
+static int g_cache_count = 0;
+static int g_cache_capacity = 0;
 
-static unsigned int hash_path(const char* path) {
-    unsigned int hash = 5381;
-    int c;
-    while ((c = *path++))
-        hash = ((hash << 5) + hash) + c;
-    return hash % CACHE_TABLE_SIZE;
+static int compare_cache_entry(const void* a, const void* b) {
+    return strcmp(((const CacheEntry*)a)->path, ((const CacheEntry*)b)->path);
 }
 
-static void load_cache() {
+static void load_cache(void) {
     FILE* f = fopen("dedup_cache.txt", "r");
     if (!f) return;
+
+    g_cache_capacity = 128;
+    g_cache = (CacheEntry*)malloc(g_cache_capacity * sizeof(CacheEntry));
+    if (!g_cache) { fclose(f); return; }
+    g_cache_count = 0;
+
     char line[MAX_PATH_LENGTH + 256];
     while (fgets(line, sizeof(line), f)) {
-        CacheEntry* entry = malloc(sizeof(CacheEntry));
-        if (!entry) break;
-        
         char* p = strrchr(line, '\n'); if (p) *p = 0;
         char* context = NULL;
-        
+
         char* token = strtok_s(line, "|", &context);
-        if (!token) { free(entry); continue; }
-        strcpy_s(entry->path, MAX_PATH_LENGTH, token);
-        
+        if (!token) continue;
+        char path[MAX_PATH_LENGTH];
+        strcpy_s(path, sizeof(path), token);
+
         token = strtok_s(NULL, "|", &context);
-        if (!token) { free(entry); continue; }
-        entry->size = atoll(token);
-        
+        if (!token) continue;
+        long long sz = atoll(token);
+
         token = strtok_s(NULL, "|", &context);
-        if (!token) { free(entry); continue; }
-        entry->modified = atoll(token);
-        
+        if (!token) continue;
+        time_t mod = atoll(token);
+
         token = strtok_s(NULL, "|", &context);
-        if (!token) { free(entry); continue; }
-        strcpy_s(entry->hash, HASH_LENGTH, token);
-        
-        unsigned int h = hash_path(entry->path);
-        entry->next = g_cache[h];
-        g_cache[h] = entry;
+        if (!token) continue;
+
+        if (g_cache_count >= g_cache_capacity) {
+            int new_cap = g_cache_capacity * 2;
+            CacheEntry* new_arr = (CacheEntry*)realloc(g_cache, new_cap * sizeof(CacheEntry));
+            if (!new_arr) break;
+            g_cache = new_arr;
+            g_cache_capacity = new_cap;
+        }
+
+        strcpy_s(g_cache[g_cache_count].path, MAX_PATH_LENGTH, path);
+        g_cache[g_cache_count].size = sz;
+        g_cache[g_cache_count].modified = mod;
+        strcpy_s(g_cache[g_cache_count].hash, HASH_LENGTH, token);
+        g_cache_count++;
     }
     fclose(f);
+
+    if (g_cache_count > 1) {
+        qsort(g_cache, g_cache_count, sizeof(CacheEntry), compare_cache_entry);
+    }
 }
 
 static bool get_cached_hash(const char* path, long long size, time_t modified, char* out_hash) {
-    unsigned int h = hash_path(path);
-    CacheEntry* entry = g_cache[h];
-    while (entry) {
-        if (strcmp(entry->path, path) == 0 && entry->size == size && entry->modified == modified) {
-            strcpy_s(out_hash, HASH_LENGTH, entry->hash);
-            return true;
-        }
-        entry = entry->next;
+    if (!g_cache || g_cache_count == 0) return false;
+
+    CacheEntry key;
+    strcpy_s(key.path, sizeof(key.path), path);
+    CacheEntry* found = (CacheEntry*)bsearch(&key, g_cache, g_cache_count, sizeof(CacheEntry), compare_cache_entry);
+
+    if (found && found->size == size && found->modified == modified) {
+        strcpy_s(out_hash, HASH_LENGTH, found->hash);
+        return true;
     }
     return false;
 }
@@ -91,18 +105,12 @@ static void save_cache(FileInfo* files, int count) {
     fclose(f);
 }
 
-static void free_cache() {
-    for (int i = 0; i < CACHE_TABLE_SIZE; i++) {
-        CacheEntry* entry = g_cache[i];
-        while (entry) {
-            CacheEntry* next = entry->next;
-            free(entry);
-            entry = next;
-        }
-        g_cache[i] = NULL;
-    }
+static void free_cache(void) {
+    free(g_cache);
+    g_cache = NULL;
+    g_cache_count = 0;
+    g_cache_capacity = 0;
 }
-
 // ============================================================================
 // DIRECTORY LIST INITIALIZATION
 // ============================================================================
@@ -398,7 +406,7 @@ static void CALLBACK HashWorkCallback(PTP_CALLBACK_INSTANCE Instance, PVOID Cont
     InterlockedDecrement(&g_pending_hashes);
 }
 
-int scan_directories(const ScanConfig* config, FileInfo* files, int max_files) {
+int scan_directories(const AdvancedConfig* config, FileInfo* files, int max_files) {
     if (!config || !files || max_files <= 0) return 0;
     
     // Initialize progress
@@ -488,33 +496,6 @@ int scan_directories(const ScanConfig* config, FileInfo* files, int max_files) {
 
 // ============================================================================
 // UTILITY: GET SCAN MODE NAME
-// ============================================================================
-const char* get_scan_mode_name(ScanMode mode) {
-    switch (mode) {
-        case SCAN_QUICK:     return "SHA-256 (1MB)";
-        case SCAN_THOROUGH:  return "SHA-256 (Full)";
-        default:             return "Unknown";
-    }
-}
-
-// ============================================================================
-// UTILITY: GET SCAN MODE DESCRIPTION
-// ============================================================================
-const char* get_scan_mode_description(ScanMode mode) {
-    switch (mode) {
-        case SCAN_QUICK:
-            return "Fast: Hashes first 1MB of each file";
-        case SCAN_THOROUGH:
-            return "Accurate: Hashes entire file";
-        default:
-            return "";
-    }
-}
-
-// ============================================================================
-// UTILITY: FORMAT FILE SIZE FOR DISPLAY
-// 
-// Converts bytes to human-readable format
 // ============================================================================
 void format_file_size(long long bytes, char* output, int output_size) {
     if (!output || output_size <= 0) return;

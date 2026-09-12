@@ -100,7 +100,7 @@ REM ============================================================================
 REM Link GUI executable
 REM ============================================================================
 echo %INFO% Linking GUI executable (%OUTPUT_EXE%)...
-gcc "%OUTPUT_DIR%\action.o" "%OUTPUT_DIR%\filter.o" "%OUTPUT_DIR%\gui_win32.o" "%OUTPUT_DIR%\Traversal.o" "%OUTPUT_DIR%\features.o" -o "%OUTPUT_EXE%" %LFLAGS% >> "%LOG_FILE%" 2>&1
+gcc "%OUTPUT_DIR%\action.o" "%OUTPUT_DIR%\filter.o" "%OUTPUT_DIR%\gui_win32.o" "%OUTPUT_DIR%\Traversal.o" "%OUTPUT_DIR%\features.o" -o "%OUTPUT_EXE%" %LFLAGS% -mwindows >> "%LOG_FILE%" 2>&1
 if errorlevel 1 (
     echo %ERROR% GUI Linking failed!
     type "%LOG_FILE%"

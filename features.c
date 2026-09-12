@@ -91,27 +91,6 @@ void close_logger(void) {
 // ============================================================================
 
 /**
- * Initialize size filter with min and max values
- */
-void init_size_filter(SizeFilter* filter, long long min_bytes, long long max_bytes) {
-    if (filter) {
-        filter->min_size = min_bytes;
-        filter->max_size = max_bytes;
-    }
-}
-
-/**
- * Initialize extension filter
- */
-void init_extension_filter(ExtensionFilter* filter, bool is_whitelist) {
-    if (filter) {
-        filter->count = 0;
-        filter->is_whitelist = is_whitelist;
-        memset(filter->extensions, 0, sizeof(filter->extensions));
-    }
-}
-
-/**
  * Add an extension to the filter
  */
 bool add_extension(ExtensionFilter* filter, const char* ext) {
@@ -331,34 +310,6 @@ long long calculate_savings(const DuplicateResults* results) {
 // ============================================================================
 // SAFE OPERATIONS IMPLEMENTATION
 // ============================================================================
-
-/**
- * Create backup folder with timestamp
- */
-static __attribute__((unused)) bool create_backup_folder(char* backup_path, size_t size) {
-    time_t now = time(NULL);
-    struct tm timeinfo_val;
-    struct tm* timeinfo = &timeinfo_val;
-    localtime_s(timeinfo, &now);
-    const char* temp_dir = getenv("TEMP");
-    if (!temp_dir || temp_dir[0] == '\0') {
-        temp_dir = getenv("TMP");
-    }
-    if (!temp_dir || temp_dir[0] == '\0') {
-        temp_dir = "C:\\Temp";
-    }
-    snprintf(backup_path, size,
-            "%s\\Dedup_Backup_%04d%02d%02d_%02d%02d%02d",
-            temp_dir,
-            timeinfo->tm_year + 1900,
-            timeinfo->tm_mon + 1,
-            timeinfo->tm_mday,
-            timeinfo->tm_hour,
-            timeinfo->tm_min,
-            timeinfo->tm_sec);
-    
-    return ensure_directory_exists(backup_path);
-}
 
 /**
  * Safe delete with backup option
@@ -595,40 +546,6 @@ bool load_config_file(const char* config_file, AdvancedConfig* config) {
                      sizeof(config->backup_folder) - 1);
         }
     }
-    
-    fclose(fp);
-    return true;
-}
-
-/**
- * Save configuration to INI-like text file
- */
-bool save_config_file(const char* config_file, const AdvancedConfig* config) {
-    if (!config_file || !config) return false;
-    
-    FILE* fp = fopen(config_file, "w");
-    if (!fp) return false;
-    
-    fprintf(fp, "# File Deduplication System Configuration\n");
-    fprintf(fp, "# Generated automatically\n\n");
-    
-    fprintf(fp, "[Scan Settings]\n");
-    fprintf(fp, "scan_mode=%d\n", config->scan_mode);
-    fprintf(fp, "skip_hidden=%s\n", config->options.skip_hidden ? "true" : "false");
-    fprintf(fp, "skip_system=%s\n", config->options.skip_system ? "true" : "false");
-    
-    fprintf(fp, "\n[Filtering]\n");
-    fprintf(fp, "min_size=%lld\n", config->size_filter.min_size);
-    fprintf(fp, "max_size=%lld\n", config->size_filter.max_size);
-    
-    fprintf(fp, "\n[Operations]\n");
-    fprintf(fp, "dry_run=%s\n", config->options.dry_run ? "true" : "false");
-    fprintf(fp, "safe_delete=%s\n", config->options.safe_delete ? "true" : "false");
-    fprintf(fp, "log_operations=%s\n", config->options.log_operations ? "true" : "false");
-    
-    fprintf(fp, "\n[Paths]\n");
-    fprintf(fp, "log_file=%s\n", config->log_file);
-    fprintf(fp, "backup_folder=%s\n", config->backup_folder);
     
     fclose(fp);
     return true;

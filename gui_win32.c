@@ -44,17 +44,13 @@
 #define IDC_BTN_DELETE_FIRST     1007
 #define IDC_BTN_MOVE             1008
 #define IDC_BTN_HARD_LINK        1009
-#define IDC_BTN_DELETE_BY_INDEX  1010
 #define IDC_BTN_MOVE_ALL         1011
+#define IDC_LABEL_TITLE          4001
+#define IDC_LABEL_DIRS           4002
+#define IDC_LABEL_EXCLUSIONS     4003
+#define IDC_LABEL_SCAN_MODE      4004
+#define IDC_LABEL_ACTIONS        4005
 
-// Delete-by-Choice dialog control IDs
-#define IDC_DBI_COMBO_GROUP    6001
-#define IDC_DBI_LIST           6002
-#define IDC_DBI_LABEL_TOP      6003
-#define IDC_DBI_LABEL_STATUS   6004
-#define IDC_DBI_LABEL_WARN     6005
-#define IDC_DBI_BTN_DELETE     6006
-#define IDC_DBI_BTN_CANCEL     6007
 
 #define IDC_LISTBOX_DIRS         2001
 #define IDC_LISTBOX_EXCLUSIONS   2002
@@ -70,7 +66,7 @@
 CRITICAL_SECTION g_dataLock;
 ProgressInfo g_progress = {0};
 
-static ScanConfig g_config = {0};
+static AdvancedConfig g_config = {0};
 static FileInfo* g_files = NULL;
 static int g_file_count = 0;
 static DuplicateResults g_results = {0};
@@ -92,134 +88,6 @@ static HWND g_btnFind;
 // Thread handles
 static HANDLE g_hScanThread = NULL;
 static HANDLE g_hFindThread = NULL;
-
-// ============================================================================
-// DELETE-BY-CHOICE DIALOG -- data types and static helpers
-// ============================================================================
-
-// Heap snapshot of one duplicate group, taken under lock before the dialog opens.
-typedef struct {
-    int        count;                       // number of files
-    char**     paths;                       // count heap strings
-    long long* sizes;                       // count file sizes
-    char       anchor[MAX_PATH_LENGTH];     // files[0].path -- stale-data identity check
-} DbiGroupSnap;
-
-// State block allocated before dialog opens; passed via lParam to the dialog proc.
-typedef struct {
-    int            group_count;
-    DbiGroupSnap*  groups;
-    // Output -- written by the proc before DestroyWindow
-    bool           confirmed;
-    int            chosen_group;    // which group the user acted on
-    bool*          delete_mask;     // delete_mask[j] == true -> permanently delete file j
-    int            mask_count;      // length of delete_mask
-} DbiDialogData;
-
-// Prevents LVN_ITEMCHANGED from triggering status updates during list repopulation.
-static bool g_dbi_repopulating = false;
-
-// Portable strdup (avoids _strdup / strdup portability questions).
-static char* dbi_strdup(const char* s) {
-    if (!s) return NULL;
-    size_t n = strlen(s) + 1;
-    char* p = (char*)malloc(n);
-    if (p) memcpy(p, s, n);
-    return p;
-}
-
-// Free everything inside a DbiDialogData and the struct itself.
-static void DbiDataFree(DbiDialogData* d) {
-    if (!d) return;
-    if (d->groups) {
-        for (int i = 0; i < d->group_count; i++) {
-            DbiGroupSnap* g = &d->groups[i];
-            if (g->paths) {
-                for (int j = 0; j < g->count; j++) free(g->paths[j]);
-                free(g->paths);
-            }
-            free(g->sizes);
-        }
-        free(d->groups);
-    }
-    free(d->delete_mask);
-    free(d);
-}
-
-// Rebuild the checkbox ListView for group gi from the snapshot.
-// Clears the list, inserts all files, and sets the default check state:
-//   file 0 unchecked (to keep), all others checked (to delete).
-static void DbiRepopulateList(HWND hDlg, const DbiDialogData* d, int gi) {
-    HWND hList = GetDlgItem(hDlg, IDC_DBI_LIST);
-    if (!hList) return;
-
-    g_dbi_repopulating = true;
-    ListView_DeleteAllItems(hList);
-
-    if (gi < 0 || gi >= d->group_count) {
-        g_dbi_repopulating = false;
-        return;
-    }
-
-    const DbiGroupSnap* grp = &d->groups[gi];
-    for (int j = 0; j < grp->count; j++) {
-        char num[8];
-        snprintf(num, sizeof(num), "%d", j + 1);
-
-        LVITEMA lvi = {0};
-        lvi.mask    = LVIF_TEXT;
-        lvi.iItem   = j;
-        lvi.pszText = num;
-        ListView_InsertItem(hList, &lvi);
-
-        const char* fname = strrchr(grp->paths[j], '\\');
-        fname = fname ? fname + 1 : grp->paths[j];
-        ListView_SetItemText(hList, j, 1, (char*)fname);
-
-        char sz[32];
-        format_file_size(grp->sizes[j], sz, sizeof(sz));
-        ListView_SetItemText(hList, j, 2, sz);
-        ListView_SetItemText(hList, j, 3, grp->paths[j]);
-
-        // Default: keep file[0], delete the rest
-        ListView_SetCheckState(hList, j, (j != 0));
-    }
-
-    g_dbi_repopulating = false;
-}
-
-// Recount checked/unchecked items and refresh the status label + button state.
-static void DbiUpdateStatus(HWND hDlg, const DbiDialogData* d, int gi) {
-    HWND hList = GetDlgItem(hDlg, IDC_DBI_LIST);
-    int total   = (gi >= 0 && gi < d->group_count) ? d->groups[gi].count : 0;
-    int checked = 0;
-    for (int j = 0; j < total; j++) {
-        if (ListView_GetCheckState(hList, j)) checked++;
-    }
-    int kept = total - checked;
-
-    char status[320];
-    if (total == 0) {
-        snprintf(status, sizeof(status), "No group selected.");
-    } else if (checked == 0) {
-        snprintf(status, sizeof(status),
-            "Nothing is ticked.  Tick the files you want to DELETE.");
-    } else if (kept == 0) {
-        snprintf(status, sizeof(status),
-            "All %d files are ticked -- you must keep at least one."
-            "  Untick a file to keep it.", total);
-    } else {
-        snprintf(status, sizeof(status),
-            "%d file(s) will be PERMANENTLY DELETED.   "
-            "%d file(s) will be KEPT in place.",
-            checked, kept);
-    }
-    SetDlgItemTextA(hDlg, IDC_DBI_LABEL_STATUS, status);
-    EnableWindow(GetDlgItem(hDlg, IDC_DBI_BTN_DELETE), (checked > 0 && kept > 0));
-}
-
-// Forward declaration
-INT_PTR CALLBACK DeleteByIndexDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 void AppendStatus(const char* text) {
     if (!text) return;
@@ -289,367 +157,6 @@ void UpdateListView() {
 // (the file to keep), then clicks "Delete Checked Files".
 // ============================================================================
 
-INT_PTR CALLBACK DeleteByIndexDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    DbiDialogData* d = (DbiDialogData*)GetWindowLongPtrA(hwnd, GWLP_USERDATA);
-
-    switch (msg) {
-        case WM_INITDIALOG: {
-            d = (DbiDialogData*)lParam;
-            SetWindowLongPtrA(hwnd, GWLP_USERDATA, (LONG_PTR)d);
-            // Resize to desired pixel dimensions and center over parent
-            SetWindowPos(hwnd, HWND_TOP, 0, 0, 590, 430,
-                         SWP_NOZORDER | SWP_NOMOVE);
-            RECT rc, rcP;
-            GetWindowRect(hwnd, &rc);
-            GetWindowRect(GetParent(hwnd), &rcP);
-            int px = rcP.left + (rcP.right  - rcP.left - (rc.right  - rc.left)) / 2;
-            int py = rcP.top  + (rcP.bottom - rcP.top  - (rc.bottom - rc.top )) / 2;
-            SetWindowPos(hwnd, HWND_TOP, px, py, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
-            // Controls are not built yet; defer population until they exist
-            PostMessage(hwnd, WM_APP + 1, 0, 0);
-            return TRUE;
-        }
-
-        case WM_APP + 1: {
-            // Controls exist now -- populate group combo then default list
-            if (!d) return TRUE;
-            HWND hCombo = GetDlgItem(hwnd, IDC_DBI_COMBO_GROUP);
-            if (!hCombo) return TRUE;
-            for (int i = 0; i < d->group_count; i++) {
-                const DbiGroupSnap* g = &d->groups[i];
-                const char* sample = strrchr(g->anchor, '\\');
-                sample = sample ? sample + 1 : g->anchor;
-                char sz[32];
-                format_file_size(g->sizes[0], sz, sizeof(sz));
-                char entry[512];
-                snprintf(entry, sizeof(entry),
-                    "Group %d  --  %d identical copies  --  \"%s\"  (%s each)",
-                    i + 1, g->count, sample, sz);
-                SendMessageA(hCombo, CB_ADDSTRING, 0, (LPARAM)entry);
-            }
-            SendMessage(hCombo, CB_SETCURSEL, 0, 0);
-            DbiRepopulateList(hwnd, d, 0);
-            DbiUpdateStatus(hwnd, d, 0);
-            return TRUE;
-        }
-
-        case WM_COMMAND: {
-            WORD ctrl  = LOWORD(wParam);
-            WORD notif = HIWORD(wParam);
-
-            if (ctrl == IDC_DBI_COMBO_GROUP && notif == CBN_SELCHANGE) {
-                int gi = (int)SendMessage(
-                    GetDlgItem(hwnd, IDC_DBI_COMBO_GROUP), CB_GETCURSEL, 0, 0);
-                DbiRepopulateList(hwnd, d, gi);
-                DbiUpdateStatus(hwnd, d, gi);
-                return TRUE;
-            }
-
-            if (ctrl == IDC_DBI_BTN_CANCEL) {
-                if (d) d->confirmed = false;
-                DestroyWindow(hwnd);
-                return TRUE;
-            }
-
-            if (ctrl == IDC_DBI_BTN_DELETE) {
-                if (!d) return TRUE;
-                int gi = (int)SendMessage(
-                    GetDlgItem(hwnd, IDC_DBI_COMBO_GROUP), CB_GETCURSEL, 0, 0);
-                if (gi < 0 || gi >= d->group_count) return TRUE;
-
-                HWND hList = GetDlgItem(hwnd, IDC_DBI_LIST);
-                int  total  = d->groups[gi].count;
-                int  n_del = 0, n_keep = 0;
-                for (int j = 0; j < total; j++) {
-                    if (ListView_GetCheckState(hList, j)) n_del++;
-                    else                                   n_keep++;
-                }
-
-                if (n_del == 0 || n_keep == 0) {
-                    MessageBoxA(hwnd,
-                        "Invalid selection.\n\n"
-                        "You must tick at least one file to delete "
-                        "AND leave at least one unticked to keep.",
-                        "Invalid Selection", MB_OK | MB_ICONWARNING);
-                    return TRUE;
-                }
-
-                // Build an explicit confirmation listing every path
-                char* confirm = (char*)malloc(4096);
-                if (!confirm) {
-                    MessageBoxA(hwnd, "Out of memory.", "Error", MB_ICONERROR);
-                    return TRUE;
-                }
-                int pos = 0;
-                pos += snprintf(confirm + pos, 4096 - pos,
-                    "The following %d file(s) will be PERMANENTLY DELETED:\n\n",
-                    n_del);
-                for (int j = 0; j < total && pos < 3800; j++) {
-                    if (ListView_GetCheckState(hList, j))
-                        pos += snprintf(confirm + pos, 4096 - pos,
-                            "  [DELETE]  %s\n", d->groups[gi].paths[j]);
-                }
-                pos += snprintf(confirm + pos, 4096 - pos,
-                    "\nThe following %d file(s) will be KEPT:\n\n", n_keep);
-                for (int j = 0; j < total && pos < 3800; j++) {
-                    if (!ListView_GetCheckState(hList, j))
-                        pos += snprintf(confirm + pos, 4096 - pos,
-                            "  [KEEP]    %s\n", d->groups[gi].paths[j]);
-                }
-                snprintf(confirm + pos, 4096 - pos,
-                    "\nThis cannot be undone.  Proceed?");
-
-                int answer = MessageBoxA(hwnd, confirm,
-                    "Confirm Permanent Deletion", MB_YESNO | MB_ICONWARNING);
-                free(confirm);
-                if (answer != IDYES) return TRUE;
-
-                // Build delete mask
-                bool* mask = (bool*)calloc(total, sizeof(bool));
-                if (!mask) {
-                    MessageBoxA(hwnd, "Out of memory.", "Error", MB_ICONERROR);
-                    return TRUE;
-                }
-                for (int j = 0; j < total; j++)
-                    mask[j] = ListView_GetCheckState(hList, j) ? true : false;
-
-                d->delete_mask  = mask;
-                d->mask_count   = total;
-                d->chosen_group = gi;
-                d->confirmed    = true;
-                DestroyWindow(hwnd);
-                return TRUE;
-            }
-            break;
-        }
-
-        case WM_NOTIFY: {
-            if (!d) break;
-            NMHDR* pnm = (NMHDR*)lParam;
-            if (pnm->idFrom == IDC_DBI_LIST &&
-                pnm->code == LVN_ITEMCHANGED) {
-                if (g_dbi_repopulating) break;
-                NMLISTVIEW* pnmlv = (NMLISTVIEW*)lParam;
-                if (!(pnmlv->uChanged & LVIF_STATE)) break;
-                int gi = (int)SendMessage(
-                    GetDlgItem(hwnd, IDC_DBI_COMBO_GROUP), CB_GETCURSEL, 0, 0);
-                DbiUpdateStatus(hwnd, d, gi);
-            }
-            break;
-        }
-
-        case WM_CLOSE:
-            if (d) d->confirmed = false;
-            DestroyWindow(hwnd);
-            return TRUE;
-    }
-    return FALSE;
-}
-
-// Snapshot g_results, show the unified Delete-by-Choice dialog, act on result.
-static void ShowDeleteByIndexDialog(void) {
-
-    // --- 1. Snapshot all group data under lock ---
-    EnterCriticalSection(&g_dataLock);
-    if (g_results.count == 0) {
-        LeaveCriticalSection(&g_dataLock);
-        MessageBoxA(g_hwndMain,
-            "No duplicate groups found.\nRun Find Duplicates first.",
-            "Nothing to Do", MB_ICONINFORMATION);
-        return;
-    }
-
-    DbiDialogData* d = (DbiDialogData*)calloc(1, sizeof(DbiDialogData));
-    if (!d) { LeaveCriticalSection(&g_dataLock); goto dbi_oom; }
-
-    d->group_count = g_results.count;
-    d->groups = (DbiGroupSnap*)calloc(d->group_count, sizeof(DbiGroupSnap));
-    if (!d->groups) {
-        LeaveCriticalSection(&g_dataLock);
-        DbiDataFree(d);
-        goto dbi_oom;
-    }
-
-    for (int i = 0; i < d->group_count; i++) {
-        DuplicateGroup* src  = &g_results.groups[i];
-        DbiGroupSnap*   snap = &d->groups[i];
-        snap->count = src->count;
-        snap->paths = (char**)calloc(src->count, sizeof(char*));
-        snap->sizes = (long long*)calloc(src->count, sizeof(long long));
-        if (!snap->paths || !snap->sizes) {
-            LeaveCriticalSection(&g_dataLock);
-            DbiDataFree(d);
-            goto dbi_oom;
-        }
-        strncpy(snap->anchor, src->files[0].path, MAX_PATH_LENGTH - 1);
-        snap->anchor[MAX_PATH_LENGTH - 1] = '\0';
-        for (int j = 0; j < src->count; j++) {
-            snap->paths[j] = dbi_strdup(src->files[j].path);
-            snap->sizes[j] = src->files[j].size;
-            if (!snap->paths[j]) {
-                LeaveCriticalSection(&g_dataLock);
-                DbiDataFree(d);
-                goto dbi_oom;
-            }
-        }
-    }
-    LeaveCriticalSection(&g_dataLock);
-
-    // --- 2. Create the dialog shell ---
-    {
-        HINSTANCE hInst = GetModuleHandle(NULL);
-        typedef struct { DLGTEMPLATE t; WORD menu; WORD cls; WORD title; } BlankDlg;
-        BlankDlg dlgt;
-        memset(&dlgt, 0, sizeof(dlgt));
-        dlgt.t.style = WS_POPUP | WS_CAPTION | WS_SYSMENU | DS_CENTER;
-        dlgt.t.cx = 300;
-        dlgt.t.cy = 200;
-
-        HWND hDlg = CreateDialogIndirectParamA(hInst, (LPCDLGTEMPLATE)&dlgt,
-                                                g_hwndMain,
-                                                DeleteByIndexDlgProc, (LPARAM)d);
-        if (!hDlg) {
-            DbiDataFree(d);
-            MessageBoxA(g_hwndMain, "Could not create the dialog window.",
-                       "Error", MB_ICONERROR);
-            return;
-        }
-        SetWindowTextA(hDlg, "Delete Duplicates by Choice");
-
-        // --- 3. Build child controls ---
-        CreateWindowA("STATIC", "Select the duplicate group to work on:",
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, 10, 560, 18, hDlg, (HMENU)IDC_DBI_LABEL_TOP, hInst, NULL);
-
-        CreateWindowA("COMBOBOX", NULL,
-            WS_CHILD | WS_VISIBLE | WS_VSCROLL | CBS_DROPDOWNLIST,
-            10, 32, 560, 200, hDlg, (HMENU)IDC_DBI_COMBO_GROUP, hInst, NULL);
-
-        CreateWindowA("STATIC",
-            "Tick the files you want to DELETE.  "
-            "Leave at least one unticked -- that one will be KEPT.",
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, 70, 560, 28, hDlg, NULL, hInst, NULL);
-
-        HWND hList = CreateWindowA(WC_LISTVIEWA, NULL,
-            WS_CHILD | WS_VISIBLE | WS_BORDER |
-            LVS_REPORT | LVS_SHOWSELALWAYS | LVS_NOSORTHEADER,
-            10, 102, 560, 200, hDlg, (HMENU)IDC_DBI_LIST, hInst, NULL);
-
-        SendMessage(hList, LVM_SETEXTENDEDLISTVIEWSTYLE, 0,
-            LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES | LVS_EX_CHECKBOXES);
-
-        LVCOLUMNA lvc;
-        memset(&lvc, 0, sizeof(lvc));
-        lvc.mask = LVCF_TEXT | LVCF_WIDTH;
-        lvc.pszText = "#";         lvc.cx = 30;  ListView_InsertColumn(hList, 0, &lvc);
-        lvc.pszText = "File Name"; lvc.cx = 155; ListView_InsertColumn(hList, 1, &lvc);
-        lvc.pszText = "Size";      lvc.cx = 70;  ListView_InsertColumn(hList, 2, &lvc);
-        lvc.pszText = "Full Path"; lvc.cx = 290; ListView_InsertColumn(hList, 3, &lvc);
-
-        CreateWindowA("STATIC", "",
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, 308, 560, 40, hDlg, (HMENU)IDC_DBI_LABEL_STATUS, hInst, NULL);
-
-        CreateWindowA("STATIC",
-            "Warning: deletion is permanent and cannot be undone.",
-            WS_CHILD | WS_VISIBLE | SS_LEFT,
-            10, 352, 560, 18, hDlg, (HMENU)IDC_DBI_LABEL_WARN, hInst, NULL);
-
-        HWND hBtnDel = CreateWindowA("BUTTON", "Delete Checked Files",
-            WS_CHILD | WS_VISIBLE | BS_DEFPUSHBUTTON,
-            10, 378, 185, 26, hDlg, (HMENU)IDC_DBI_BTN_DELETE, hInst, NULL);
-        EnableWindow(hBtnDel, FALSE);  // enabled only once a valid selection exists
-
-        CreateWindowA("BUTTON", "Cancel (do nothing)",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            205, 378, 160, 26, hDlg, (HMENU)IDC_DBI_BTN_CANCEL, hInst, NULL);
-
-        // --- 4. Show and run local message pump ---
-        ShowWindow(hDlg, SW_SHOW);
-        UpdateWindow(hDlg);
-
-        MSG msg;
-        while (GetMessage(&msg, NULL, 0, 0)) {
-            if (!IsWindow(hDlg)) break;
-            if (!IsDialogMessage(hDlg, &msg)) {
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
-            }
-        }
-    } /* end dialog scope */
-
-    // --- 5. If cancelled, bail out ---
-    if (!d->confirmed) {
-        DbiDataFree(d);
-        return;
-    }
-
-    // --- 6. Re-validate using identity anchor before touching disk ---
-    {
-        int   gi         = d->chosen_group;
-        bool* mask       = d->delete_mask;
-        int   mask_count = d->mask_count;
-        char  anchor[MAX_PATH_LENGTH];
-        strncpy(anchor, d->groups[gi].anchor, MAX_PATH_LENGTH - 1);
-        anchor[MAX_PATH_LENGTH - 1] = '\0';
-
-        EnterCriticalSection(&g_dataLock);
-        bool stale = (gi >= g_results.count)
-                  || (g_results.groups[gi].count != mask_count)
-                  || (strcmp(g_results.groups[gi].files[0].path, anchor) != 0);
-
-        if (stale) {
-            LeaveCriticalSection(&g_dataLock);
-            DbiDataFree(d);
-            MessageBoxA(g_hwndMain,
-                "The duplicate list changed while the dialog was open.\n\n"
-                "The operation has been cancelled to prevent accidental data loss.\n"
-                "Please run Find Duplicates again.",
-                "Results Changed", MB_ICONWARNING);
-            return;
-        }
-
-        // --- 7. Delete the ticked files ---
-        int removed = 0, failed = 0;
-        DuplicateGroup* tgt = &g_results.groups[gi];
-        for (int j = 0; j < tgt->count; j++) {
-            if (j >= mask_count || !mask[j]) continue;
-            if (DeleteFileA(tgt->files[j].path)) removed++;
-            else                                  failed++;
-        }
-        free_duplicate_results(&g_results);
-        memset(&g_results, 0, sizeof(g_results));
-        LeaveCriticalSection(&g_dataLock);
-
-        DbiDataFree(d);
-
-        // --- 8. Update status box and disable action buttons ---
-        char status[256];
-        if (failed > 0) {
-            snprintf(status, sizeof(status),
-                "Deleted %d file(s) from Group %d.  "
-                "%d file(s) could not be deleted (check permissions).\r\n",
-                removed, gi + 1, failed);
-        } else {
-            snprintf(status, sizeof(status),
-                "Deleted %d file(s) from Group %d.\r\n", removed, gi + 1);
-        }
-        AppendStatus(status);
-        ListView_DeleteAllItems(g_listResults);
-        EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_FIRST),    FALSE);
-        EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE),            FALSE);
-        EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_HARD_LINK),       FALSE);
-        EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_BY_INDEX), FALSE);
-        EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE_ALL),        FALSE);
-    }
-    return;
-
-dbi_oom:
-    MessageBoxA(g_hwndMain,
-        "Out of memory while reading the duplicate list.", "Error", MB_ICONERROR);
-}
-
 DWORD WINAPI ScanThread(LPVOID param) {
     (void)param;  // Suppress unused parameter warning
     AppendStatus("Scanning directories...\r\n");
@@ -666,7 +173,7 @@ DWORD WINAPI ScanThread(LPVOID param) {
     }
     
     EnterCriticalSection(&g_dataLock);
-    ScanConfig config_copy = g_config;
+    AdvancedConfig config_copy = g_config;
     LeaveCriticalSection(&g_dataLock);
     
     int count = scan_directories(&config_copy, g_files, MAX_FILES);
@@ -948,14 +455,9 @@ void OnDeleteFirst() {
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_FIRST),    FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE),            FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_HARD_LINK),       FALSE);
-    EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_BY_INDEX), FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE_ALL),        FALSE);
 }
 
-// OnDeleteByIndex: opens the unified Delete-by-Choice dialog.
-void OnDeleteByIndex(void) {
-    ShowDeleteByIndexDialog();
-}
 
 void OnMove() {
     BROWSEINFOA bi = {0};
@@ -981,7 +483,6 @@ void OnMove() {
             EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_FIRST),    FALSE);
             EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE),            FALSE);
             EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_HARD_LINK),       FALSE);
-            EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_BY_INDEX), FALSE);
             EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE_ALL),        FALSE);
         }
         CoTaskMemFree(pidl);
@@ -1045,7 +546,6 @@ void OnMoveAll() {
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_FIRST),    FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE),            FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_HARD_LINK),       FALSE);
-    EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_BY_INDEX), FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE_ALL),        FALSE);
 }
 
@@ -1079,57 +579,101 @@ void OnHardLink() {
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_FIRST), FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_MOVE), FALSE);
     EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_HARD_LINK), FALSE);
-    EnableWindow(GetDlgItem(g_hwndMain, IDC_BTN_DELETE_BY_INDEX), FALSE);
 }
 
-// Handle window resizing
+static BOOL CALLBACK SetChildFont(HWND hwndChild, LPARAM lParam) {
+    SendMessage(hwndChild, WM_SETFONT, (WPARAM)lParam, TRUE);
+    return TRUE;
+}
+
+// Handle window resizing with symmetrical grid scaling
 void OnSize(HWND hwnd, UINT state, int cx, int cy) {
-    (void)state;  // Suppress unused parameter warning
-    // Update control positions based on new window size
-    int margin = 10;
-    int buttonWidth = 130;
-    int buttonHeight = 28;
+    (void)state;
+    if (cx <= 0 || cy <= 0) return;
+
+    int margin = 14;
     int spacing = 10;
-    
-    // Calculate positions
-    int y_actions = cy - 180;
-    int y_status = cy - 80;
-    int listview_height = y_actions - 345;
-    int progress_width = cx - 20;
-    
-    // Update progress bar
-    SetWindowPos(g_hwndProgress, NULL, margin, 245, progress_width, 20, SWP_NOZORDER);
-    
-    // Update ListView
-    SetWindowPos(g_listResults, NULL, margin, 335, progress_width, listview_height, SWP_NOZORDER);
-    
-    // Update status edit
-    SetWindowPos(g_editStatus, NULL, margin, y_status, progress_width, 80, SWP_NOZORDER);
-    
-    // Update action buttons
-    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_DELETE_FIRST), NULL, margin, y_actions, buttonWidth, buttonHeight, SWP_NOZORDER);
-    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_DELETE_BY_INDEX), NULL, margin + buttonWidth + spacing, y_actions, buttonWidth, buttonHeight, SWP_NOZORDER);
-    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_MOVE), NULL, margin + (buttonWidth + spacing) * 2, y_actions, buttonWidth, buttonHeight, SWP_NOZORDER);
-    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_HARD_LINK), NULL, margin + (buttonWidth + spacing) * 3, y_actions, buttonWidth, buttonHeight, SWP_NOZORDER);
-    
-    // Update ListView columns to resize
+    int w_full = cx - 2 * margin;
+
+    // Header title
+    SetWindowPos(GetDlgItem(hwnd, IDC_LABEL_TITLE), NULL, margin, 8, w_full, 22, SWP_NOZORDER);
+
+    // Top section: Symmetrical 2-column grid
+    int col_width = (w_full - spacing) / 2;
+    int col1_x = margin;
+    int col2_x = margin + col_width + spacing;
+    int top_btn_w = 110;
+    int top_list_w = col_width - top_btn_w - spacing;
+    if (top_list_w < 100) top_list_w = 100;
+
+    int y_top = 34;
+    // Left column: Directories
+    SetWindowPos(GetDlgItem(hwnd, IDC_LABEL_DIRS), NULL, col1_x, y_top, top_list_w, 18, SWP_NOZORDER);
+    SetWindowPos(g_listDirs, NULL, col1_x, y_top + 20, top_list_w, 100, SWP_NOZORDER);
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_ADD_DIR), NULL, col1_x + top_list_w + spacing, y_top + 20, top_btn_w, 26, SWP_NOZORDER);
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_REMOVE_DIR), NULL, col1_x + top_list_w + spacing, y_top + 52, top_btn_w, 26, SWP_NOZORDER);
+
+    // Right column: Exclusions
+    SetWindowPos(GetDlgItem(hwnd, IDC_LABEL_EXCLUSIONS), NULL, col2_x, y_top, top_list_w, 18, SWP_NOZORDER);
+    SetWindowPos(g_listExclusions, NULL, col2_x, y_top + 20, top_list_w, 100, SWP_NOZORDER);
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_ADD_EXCLUSION), NULL, col2_x + top_list_w + spacing, y_top + 20, top_btn_w, 26, SWP_NOZORDER);
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_REMOVE_EXCLUSION), NULL, col2_x + top_list_w + spacing, y_top + 52, top_btn_w, 26, SWP_NOZORDER);
+
+    // Middle controls row
+    int y_mid = y_top + 100 + 12; // 146
+    SetWindowPos(g_checkSubdirs, NULL, margin, y_mid + 2, 175, 22, SWP_NOZORDER);
+    SetWindowPos(GetDlgItem(hwnd, IDC_LABEL_SCAN_MODE), NULL, margin + 195, y_mid + 4, 75, 18, SWP_NOZORDER);
+    SetWindowPos(g_comboHash, NULL, margin + 275, y_mid, 185, 120, SWP_NOZORDER);
+
+    // Scan / Find triggers
+    int y_trig = y_mid + 30; // 176
+    int trig_w = 150;
+    SetWindowPos(g_btnScan, NULL, margin, y_trig, trig_w, 28, SWP_NOZORDER);
+    SetWindowPos(g_btnFind, NULL, margin + trig_w + spacing, y_trig, trig_w, 28, SWP_NOZORDER);
+
+    // Progress bar
+    int y_prog = y_trig + 36; // 212
+    SetWindowPos(g_hwndProgress, NULL, margin, y_prog, w_full, 18, SWP_NOZORDER);
+
+    // Action buttons toolbar
+    int y_act_label = y_prog + 24; // 236
+    SetWindowPos(GetDlgItem(hwnd, IDC_LABEL_ACTIONS), NULL, margin, y_act_label, 250, 18, SWP_NOZORDER);
+
+    int y_act_btns = y_act_label + 20; // 256
+    int act_btn_w = (w_full - 3 * spacing) / 4;
+    int act_btn_h = 28;
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_DELETE_FIRST), NULL, margin, y_act_btns, act_btn_w, act_btn_h, SWP_NOZORDER);
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_MOVE), NULL, margin + (act_btn_w + spacing), y_act_btns, act_btn_w, act_btn_h, SWP_NOZORDER);
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_MOVE_ALL), NULL, margin + (act_btn_w + spacing) * 2, y_act_btns, act_btn_w, act_btn_h, SWP_NOZORDER);
+    SetWindowPos(GetDlgItem(hwnd, IDC_BTN_HARD_LINK), NULL, margin + (act_btn_w + spacing) * 3, y_act_btns, act_btn_w, act_btn_h, SWP_NOZORDER);
+
+    // Bottom status and middle results ListView
+    int y_list = y_act_btns + act_btn_h + 8; // 292
+    int status_h = 80;
+    int y_status = cy - margin - status_h;
+    int listview_h = y_status - y_list - spacing;
+    if (listview_h < 80) listview_h = 80;
+
+    SetWindowPos(g_listResults, NULL, margin, y_list, w_full, listview_h, SWP_NOZORDER);
+    SetWindowPos(g_editStatus, NULL, margin, y_status, w_full, status_h, SWP_NOZORDER);
+
+    // Proportional column resizing in ListView
     LVCOLUMNA lvc = {0};
     lvc.mask = LVCF_WIDTH;
-    
-    // Get current column widths
-    lvc.cx = 100;
+    lvc.cx = 105;
     ListView_SetColumn(g_listResults, 0, &lvc);
-    
-    lvc.cx = 80;
+
+    lvc.cx = 90;
     ListView_SetColumn(g_listResults, 1, &lvc);
-    
-    // Resize filename and path columns proportionally
-    int remaining_width = progress_width - 180; // Subtract fixed column widths
-    lvc.cx = remaining_width * 0.25; // 25% for filename
-    ListView_SetColumn(g_listResults, 2, &lvc);
-    
-    lvc.cx = remaining_width * 0.75; // 75% for path
-    ListView_SetColumn(g_listResults, 3, &lvc);
+
+    int rem_w = w_full - 195 - 25; // subtract fixed columns and scrollbar
+    if (rem_w > 100) {
+        lvc.cx = (int)(rem_w * 0.30);
+        ListView_SetColumn(g_listResults, 2, &lvc);
+
+        lvc.cx = rem_w - lvc.cx;
+        ListView_SetColumn(g_listResults, 3, &lvc);
+    }
 }
 
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
@@ -1173,9 +717,7 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
                 300, 95, 110, 25, hwnd, (HMENU)IDC_BTN_REMOVE_DIR, NULL, NULL);
             
-            CreateWindowA("STATIC", "Folders to Exclude:", 
-                WS_VISIBLE | WS_CHILD,
-                420, 45, 200, 20, hwnd, NULL, NULL, NULL);
+            CreateWindowA("STATIC", "Folders to Exclude:", WS_VISIBLE | WS_CHILD, 420, 34, 200, 18, hwnd, (HMENU)IDC_LABEL_EXCLUSIONS, NULL, NULL); 
             
             g_listExclusions = CreateWindowA("LISTBOX", NULL,
                 WS_VISIBLE | WS_CHILD | WS_BORDER | WS_VSCROLL | LBS_NOTIFY,
@@ -1194,18 +736,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 10, 175, 180, 20, hwnd, (HMENU)IDC_CHECK_SUBDIRS, NULL, NULL);
             SendMessage(g_checkSubdirs, BM_SETCHECK, BST_CHECKED, 0);
             
-            CreateWindowA("STATIC", "Scan Mode:", 
-                WS_VISIBLE | WS_CHILD,
-                200, 177, 100, 20, hwnd, NULL, NULL, NULL);
+            CreateWindowA("STATIC", "Scan Mode:", WS_VISIBLE | WS_CHILD, 210, 150, 75, 18, hwnd, (HMENU)IDC_LABEL_SCAN_MODE, NULL, NULL); 
             
             g_comboHash = CreateWindowA("COMBOBOX", NULL,
                 WS_VISIBLE | WS_CHILD | CBS_DROPDOWNLIST | WS_VSCROLL,
                 300, 175, 150, 100, hwnd, (HMENU)IDC_COMBO_HASH, NULL, NULL);
             
             SendMessageA(g_comboHash, CB_ADDSTRING, 0, 
-                (LPARAM)"FNV-1a (1MB)(fast)");
+                (LPARAM)"SHA-256 (1MB Quick)");
             SendMessageA(g_comboHash, CB_ADDSTRING, 0, 
-                (LPARAM)"FNV-1a (Full)(slower)");
+                (LPARAM)"SHA-256 (Full Thorough)");
             SendMessage(g_comboHash, CB_SETCURSEL, 0, 0);
             
             g_btnScan = CreateWindowA("BUTTON", "Scan Directories", 
@@ -1221,19 +761,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 10, 245, 810, 20, hwnd, (HMENU)IDC_PROGRESS, NULL, NULL);
             SendMessage(g_hwndProgress, PBM_SETRANGE, 0, MAKELPARAM(0, 100));
             
-            CreateWindowA("STATIC", "Actions:", 
-                WS_VISIBLE | WS_CHILD,
-                10, 275, 150, 20, hwnd, NULL, NULL, NULL);
+            CreateWindowA("STATIC", "Actions (Applied to Duplicates):", WS_VISIBLE | WS_CHILD, 14, 236, 250, 18, hwnd, (HMENU)IDC_LABEL_ACTIONS, NULL, NULL); 
             
             CreateWindowA("BUTTON", "Delete (Keep First)", 
                 WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
                 10, 295, 130, 28, hwnd, (HMENU)IDC_BTN_DELETE_FIRST, NULL, NULL);
             EnableWindow(GetDlgItem(hwnd, IDC_BTN_DELETE_FIRST), FALSE);
             
-            CreateWindowA("BUTTON", "Delete by Index", 
-                WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
-                150, 295, 130, 28, hwnd, (HMENU)IDC_BTN_DELETE_BY_INDEX, NULL, NULL);
-            EnableWindow(GetDlgItem(hwnd, IDC_BTN_DELETE_BY_INDEX), FALSE);
             
             CreateWindowA("BUTTON", "Move to Folder",
                 WS_VISIBLE | WS_CHILD | BS_PUSHBUTTON,
@@ -1281,10 +815,20 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 WS_VISIBLE | WS_CHILD | WS_BORDER | WS_VSCROLL | 
                 ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL,
                 10, 525, 810, 100, hwnd, (HMENU)IDC_EDIT_STATUS, NULL, NULL);
+
+            HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
+            EnumChildWindows(hwnd, SetChildFont, (LPARAM)hFont);
             
             break;
         }
         
+        case WM_GETMINMAXINFO: {
+            LPMINMAXINFO mmi = (LPMINMAXINFO)lParam;
+            mmi->ptMinTrackSize.x = 760;
+            mmi->ptMinTrackSize.y = 560;
+            return 0;
+        }
+
         case WM_SIZE:
             OnSize(hwnd, (UINT)wParam, LOWORD(lParam), HIWORD(lParam));
             return 0;
@@ -1322,7 +866,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             EnableWindow(GetDlgItem(hwnd, IDC_BTN_MOVE),            has_results);
             EnableWindow(GetDlgItem(hwnd, IDC_BTN_MOVE_ALL),        has_results);
             EnableWindow(GetDlgItem(hwnd, IDC_BTN_HARD_LINK),       has_results);
-            EnableWindow(GetDlgItem(hwnd, IDC_BTN_DELETE_BY_INDEX), has_results);
             break;
         }
         
@@ -1335,7 +878,6 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                 case IDC_BTN_SCAN: OnScan(); break;
                 case IDC_BTN_FIND: OnFind(); break;
                 case IDC_BTN_DELETE_FIRST: OnDeleteFirst(); break;
-                case IDC_BTN_DELETE_BY_INDEX: OnDeleteByIndex(); break;
                 case IDC_BTN_MOVE:            OnMove(); break;
                 case IDC_BTN_MOVE_ALL:        OnMoveAll(); break;
                 case IDC_BTN_HARD_LINK:       OnHardLink(); break;

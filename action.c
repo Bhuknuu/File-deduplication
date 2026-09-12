@@ -37,110 +37,11 @@ int remove_duplicates_keep_first(DuplicateResults* results) {
 }
 
 int move_duplicates(DuplicateResults* results, const char* dest_folder) {
-    if (!results || !dest_folder) return 0;
-    if (results->count == 0) return 0;
-    
-    // Ensure destination exists
-    if (!ensure_directory_exists(dest_folder)) {
-        return 0;
-    }
-    
-    int moved = 0;
-    
-    for (int i = 0; i < results->count; i++) {
-        DuplicateGroup* group = &results->groups[i];
-        
-        // Move all except first
-        for (int j = 1; j < group->count; j++) {
-            // Extract filename from path
-            const char* filename = strrchr(group->files[j].path, '\\');
-            if (!filename) {
-                filename = group->files[j].path;
-            } else {
-                filename++;  // Skip backslash
-            }
-            
-            // Build destination path
-            char dest_path[MAX_PATH_LENGTH];
-            int len = snprintf(dest_path, MAX_PATH_LENGTH, 
-                              "%s\\%s", dest_folder, filename);
-            
-            if (len >= MAX_PATH_LENGTH - 1) {
-                continue;  // Path too long
-            }
-            
-            // Handle conflicts
-            if (GetFileAttributesA(dest_path) != INVALID_FILE_ATTRIBUTES) {
-                // File exists - append number
-                char base_name[MAX_PATH_LENGTH];
-                const char* ext = strrchr(filename, '.');
-                
-                if (ext) {
-                    // Split into base and extension
-                    size_t base_len = ext - filename;
-                    if (base_len >= MAX_PATH_LENGTH) {
-                        base_len = MAX_PATH_LENGTH - 1;
-                    }
-                    
-                    strncpy(base_name, filename, base_len);
-                    base_name[base_len] = '\0';
-                    
-                    // Try base_1.ext, base_2.ext, ...
-                    for (int n = 1; n < 10000; n++) {
-                        int written = snprintf(dest_path, MAX_PATH_LENGTH, 
-                                "%s\\%s_%d%s", 
-                                dest_folder, base_name, n, ext);
-                        // Verify no truncation occurred
-                        if (written > 0 && written < MAX_PATH_LENGTH) {
-                            if (GetFileAttributesA(dest_path) == 
-                                INVALID_FILE_ATTRIBUTES) {
-                                break;  // Found available name
-                            }
-                        }
-                    }
-                    if (GetFileAttributesA(dest_path) != INVALID_FILE_ATTRIBUTES) continue;
-                } else {
-                    // No extension
-                    for (int n = 1; n < 10000; n++) {
-                        int written = snprintf(dest_path, MAX_PATH_LENGTH, 
-                                "%s\\%s_%d", 
-                                dest_folder, filename, n);
-                        // Verify no truncation occurred
-                        if (written > 0 && written < MAX_PATH_LENGTH) {
-                        
-                            if (GetFileAttributesA(dest_path) == 
-                                INVALID_FILE_ATTRIBUTES) {
-                                break;
-                            }
-                        }
-                    }
-                    if (GetFileAttributesA(dest_path) != INVALID_FILE_ATTRIBUTES) continue;
-                }
-            }
-            
-            // Move file
-            if (MoveFileA(group->files[j].path, dest_path)) {
-                moved++;
-            }
-        }
-    }
-    
-    return moved;
+    return move_duplicates_safe(results, dest_folder, NULL, false);
 }
 
 // ============================================================================
 // MOVE ALL DUPLICATES ORGANIZED
-//
-// Rules:
-//   - If a group has exactly 2 files (one original + one duplicate):
-//     move the duplicate flat into dest_folder.
-//   - If a group has 3+ files (one original + 2+ duplicates):
-//     create a subfolder named after the original filename (without extension),
-//     move all duplicates there.
-//   - Collision handling: append _1, _2, etc. in all cases.
-//
-// The "original" (files[0]) is always kept in place.
-// RETURNS: Total number of files moved.
 // ============================================================================
 int move_all_duplicates_organized(DuplicateResults* results, const char* dest_folder) {
     if (!results || !dest_folder || results->count == 0) return 0;

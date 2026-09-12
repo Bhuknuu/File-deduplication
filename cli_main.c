@@ -365,17 +365,11 @@ int main(int argc, char* argv[]) {
         return 2;
     }
 
-    ScanConfig scan_cfg = {
-        .scan_mode = ctx.config.scan_mode,
-        .directories = ctx.config.directories,
-        .exclusions = ctx.config.exclusions
-    };
-
     if (!ctx.json_mode && !ctx.quiet) {
         printf("[INFO] Scanning directories...\n");
     }
 
-    int raw_count = scan_directories(&scan_cfg, files, MAX_FILES);
+    int raw_count = scan_directories(&ctx.config, files, MAX_FILES);
 
     // Apply filtering (size, extensions, hidden, system)
     int filtered_count = 0;

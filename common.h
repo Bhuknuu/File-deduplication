@@ -150,16 +150,6 @@ typedef struct {
 } AdvancedConfig;
 
 // ============================================================================
-// SCAN CONFIGURATION STRUCTURE
-// Combines all settings for scan operation (DEPRECATED - use AdvancedConfig)
-// ============================================================================
-typedef struct {
-    ScanMode scan_mode;
-    DirectoryList directories;
-    ExclusionList exclusions;
-} ScanConfig;
-
-// ============================================================================
 // PROGRESS INFORMATION STRUCTURE
 // For reporting progress to UI thread
 // ============================================================================
@@ -189,7 +179,7 @@ bool is_excluded(const ExclusionList* list, const char* path);
 // ============================================================================
 // FUNCTION PROTOTYPES - File Scanning
 // ============================================================================
-int scan_directories(const ScanConfig* config, FileInfo* files, int max_files);
+int scan_directories(const AdvancedConfig* config, FileInfo* files, int max_files);
 void compute_hash(const char* filename, char* output, ScanMode mode);
 
 // ============================================================================
@@ -217,8 +207,6 @@ void close_logger(void);
 // FUNCTION PROTOTYPES - QOL Features: Filtering
 // ============================================================================
 bool should_process_file(const char* filename, const AdvancedConfig* config);
-void init_size_filter(SizeFilter* filter, long long min_bytes, long long max_bytes);
-void init_extension_filter(ExtensionFilter* filter, bool is_whitelist);
 bool add_extension(ExtensionFilter* filter, const char* ext);
 bool matches_extension_filter(const char* filename, const ExtensionFilter* filter);
 
@@ -239,14 +227,11 @@ int move_duplicates_safe(DuplicateResults* results, const char* dest_folder, con
 // FUNCTION PROTOTYPES - QOL Features: Configuration
 // ============================================================================
 bool load_config_file(const char* config_file, AdvancedConfig* config);
-bool save_config_file(const char* config_file, const AdvancedConfig* config);
 void init_advanced_config(AdvancedConfig* config);
 
 // ============================================================================
 // FUNCTION PROTOTYPES - Utility Functions
 // ============================================================================
-const char* get_scan_mode_name(ScanMode mode);
-const char* get_scan_mode_description(ScanMode mode);
 bool ensure_directory_exists(const char* path);
 void format_file_size(long long bytes, char* output, int output_size);
 
