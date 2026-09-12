@@ -209,8 +209,8 @@ build.bat
 ```
 
 Compiles two binaries into `build\`:
-1. `build\FileDeduplication.exe` — Interactive Win32 desktop application
-2. `build\dedup-cli.exe` — Headless scriptable CLI binary with JSON support
+1. `build\FileDeduplication.exe`: Interactive Win32 desktop application
+2. `build\dedup-cli.exe`: Headless scriptable CLI binary with JSON support
 
 ### Manual Compilation
 ```cmd
@@ -231,3 +231,135 @@ gcc -Wall -Wextra -std=c11 -O2 -D_WIN32_WINNT=0x0601 ^
   - `Move All (Organized)`: Moves single duplicate pairs into flat folder; multi-duplicate clusters into subdirectories named after original file.
   - `Replace with Hard Links`: Replaces duplicate files with NTFS hard links (`CreateHardLinkA`), freeing physical disk space while keeping all file paths intact.
   - `Delete by Choice`: Interactive dialog to inspect metadata differences and select which specific duplicates to discard.
+
+---
+
+## CLI Reference
+
+`dedup-cli.exe` provides scriptable command-line deduplication for headless servers, scripts, and automation pipelines.
+
+### Syntax
+```cmd
+build\dedup-cli.exe [ACTION] [OPTIONS]
+```
+
+### Primary Actions
+| Action | Description | Default Safety |
+|---|---|---|
+| `--scan` | Locate and display duplicate groups (default action) | Non-destructive |
+| `--delete` | Delete duplicate instances, retaining the original file | Requires `--apply` |
+| `--safe-delete` | Move duplicates to a backup directory with relative paths | Requires `--apply` and `--backup-dir` |
+| `--move <folder>` | Move all duplicates into a target destination directory | Requires `--apply` |
+| `--hardlink` | Replace duplicate files with NTFS hard links | Requires `--apply` |
+
+### Safety Flags
+- `--dry-run`: Default behavior. Calculates actions and outputs impact without altering files.
+- `--apply`, `--force`: Required to commit file mutations when calling `--delete`, `--safe-delete`, `--move`, or `--hardlink`.
+- `--backup-dir <folder>`: Required target directory when running `--safe-delete`.
+
+### Target and Filter Options
+- `-d, --dir <folder>`: Directory to scan (pass multiple times for multi-root analysis).
+- `-x, --exclude <folder>`: Directory path to skip.
+- `--no-subdirs`: Restrict search to top-level folder only.
+- `--quick`: Hash only the initial 1 MB of each file.
+- `--thorough`: Hash full file bodies (default).
+- `--min-size <size>`: Ignore files smaller than threshold (supports `K`, `M`, `G` suffixes, e.g. `500K`, `10M`).
+- `--max-size <size>`: Ignore files larger than threshold (e.g. `2G`).
+- `--ext <list>`: Comma-separated extension whitelist (e.g. `.jpg,.png,.zip`).
+- `--exclude-ext <list>`: Comma-separated extension blacklist (e.g. `.tmp,.bak`).
+- `--include-hidden`: Include hidden files during directory traversal.
+- `--include-system`: Include system files during directory traversal.
+
+### Reporting and Machine Integration
+- `--json`: Emit a structured JSON document to stdout containing scanned file counts, recoverable bytes, and duplicate groups.
+- `--csv <file>`: Write results report to a CSV file.
+- `--txt <file>`: Write a formatted plain text summary report.
+- `-q, --quiet`: Suppress routine console output, reporting only critical errors.
+- `--check`: Return exit code 1 if duplicates exist, 0 if no duplicates are detected. Useful for test suites.
+- `-c, --config <file>`: Read scan and filtering parameters from a configuration file.
+- `--log <file>`: Append operational events and timestamps to a persistent log file.
+
+### CLI Examples
+```cmd
+:: Preview duplicates across two drives in JSON format
+build\dedup-cli.exe -d D:\Media -d E:\Archives --json
+
+:: Filter large media files and export to CSV
+build\dedup-cli.exe -d D:\Videos --min-size 100M --ext .mp4,.mkv --csv duplicates.csv
+
+:: Replace duplicates with NTFS hard links to reclaim space safely
+build\dedup-cli.exe -d D:\Backups --hardlink --apply
+
+:: Move duplicate files to a backup directory
+build\dedup-cli.exe -d D:\Projects --safe-delete --backup-dir D:\TrashArchive --apply
+```
+
+---
+
+## Configuration File Reference
+
+Parameters can be placed in `dedup.cfg` to run recurring tasks without repeating command-line switches:
+
+```ini
+# Primary targets and traversal
+directories=D:\Media\Photos,D:\Storage\Backups
+exclusions=D:\Media\Photos\.git,D:\Storage\Backups\temp
+include_subdirs=true
+scan_mode=quick
+
+# Size boundaries (in bytes)
+min_size=1048576
+max_size=1073741824
+
+# File filters
+extensions=.png,.jpg,.mp4,.zip
+skip_hidden=true
+skip_system=true
+
+# Execution safety
+dry_run=true
+safe_delete=true
+backup_folder=D:\Deduplication_Backups
+
+# Audit logging
+log_operations=true
+log_file=dedup_operations.log
+```
+
+---
+
+## Developer C API
+
+For custom tools embedding the deduplication engine, `features.c` exposes an API to load configurations, filter files, and export findings:
+
+```c
+#include "common.h"
+
+int main(void) {
+    AdvancedConfig config;
+    init_advanced_config(&config);
+    load_config_file("dedup.cfg", &config);
+
+    if (config.options.log_operations) {
+        init_logger(config.log_file);
+        log_operation("Scan initiated from configuration");
+    }
+
+    FileInfo* files = (FileInfo*)malloc(MAX_FILES * sizeof(FileInfo));
+    ScanConfig sc = {
+        .scan_mode = config.scan_mode,
+        .directories = config.directories,
+        .exclusions = config.exclusions
+    };
+
+    int count = scan_directories(&sc, files, MAX_FILES);
+    DuplicateResults results = find_duplicates(files, count);
+
+    export_duplicates_csv(&results, "results.csv");
+
+    free_duplicate_results(&results);
+    free(files);
+    close_logger();
+    return 0;
+}
+```
