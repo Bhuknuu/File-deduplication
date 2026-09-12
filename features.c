@@ -517,6 +517,7 @@ void init_advanced_config(AdvancedConfig* config) {
     memset(config, 0, sizeof(AdvancedConfig));
     
     config->scan_mode = SCAN_QUICK;
+    config->directories.include_subdirs = true;
     config->options.dry_run = false;
     config->options.safe_delete = true;
     config->options.log_operations = true;
